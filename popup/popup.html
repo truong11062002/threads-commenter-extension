@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Threads AI Commenter</title>
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+  <div class="app">
+
+    <!-- Header -->
+    <header class="header">
+      <div class="logo">
+        <span class="logo-icon">✦</span>
+        <div>
+          <div class="logo-title">ThreadsAI</div>
+          <div class="logo-sub">Auto Comment</div>
+        </div>
+      </div>
+    </header>
+
+    <!-- Config Section (always visible) -->
+    <div class="config-section">
+
+      <!-- API Key row -->
+      <div class="config-row">
+        <label class="config-label">OpenAI API Key</label>
+        <div class="api-input-wrap">
+          <input
+            type="password"
+            id="apiKeyInput"
+            class="api-input"
+            placeholder="sk-proj-..."
+            autocomplete="off"
+            spellcheck="false"
+          />
+          <button class="save-key-btn" id="saveKeyBtn">Save</button>
+        </div>
+        <div class="config-hint" id="keyStatus">Not set — add your key above</div>
+      </div>
+
+      <!-- Model selector row -->
+      <div class="config-row">
+        <label class="config-label">Model</label>
+        <div class="model-select-wrap">
+          <select id="modelSelect" class="model-select">
+            <optgroup label="GPT-5">
+              <option value="gpt-5.5">gpt-5.5  ·  newest quality</option>
+            </optgroup>
+            <optgroup label="GPT-4o">
+              <option value="gpt-4o-mini" selected>gpt-4o-mini  ·  fast &amp; cheap (~$0.001)</option>
+              <option value="gpt-4o">gpt-4o  ·  best quality (~$0.01)</option>
+            </optgroup>
+            <optgroup label="GPT-4.1">
+              <option value="gpt-4.1-mini">gpt-4.1-mini  ·  smart &amp; fast</option>
+              <option value="gpt-4.1-nano">gpt-4.1-nano  ·  fastest &amp; cheapest</option>
+              <option value="gpt-4.1">gpt-4.1  ·  most capable</option>
+            </optgroup>
+          </select>
+        </div>
+      </div>
+
+      <!-- User voice row -->
+      <div class="config-row">
+        <label class="config-label" for="userVoiceInput">Your voice</label>
+        <textarea
+          id="userVoiceInput"
+          class="voice-input"
+          rows="4"
+          placeholder="Example: I sound natural, lightly witty, casual, concise, specific, and never generic..."
+          spellcheck="false"
+        ></textarea>
+        <div class="config-actions">
+          <button class="save-key-btn" id="saveVoiceBtn">Save voice</button>
+          <div class="config-hint" id="voiceStatus">Optional — used in every comment</div>
+        </div>
+      </div>
+
+      <!-- Threads strategy row -->
+      <div class="config-row">
+        <label class="config-label" for="viralStrategyInput">Threads comment strategy</label>
+        <textarea
+          id="viralStrategyInput"
+          class="voice-input"
+          rows="4"
+          placeholder="Example: Add a specific angle, invite thoughtful replies, and ask a concrete follow-up question when natural..."
+          spellcheck="false"
+        ></textarea>
+        <div class="config-actions config-actions--split">
+          <label class="toggle-row">
+            <input type="checkbox" id="useViralStrategyToggle" checked />
+            <span>Optimize for replies</span>
+          </label>
+          <button class="secondary-btn" id="resetStrategyBtn">Use default</button>
+        </div>
+        <div class="config-hint" id="strategyStatus">Guides AI toward conversation-friendly comments</div>
+      </div>
+
+      <!-- Reply icon row -->
+      <div class="config-row">
+        <label class="config-label" for="iconPromptInput">Reply icon</label>
+        <div class="icon-tools">
+          <div class="icon-preview" id="iconPreview" title="Current reply icon">✦</div>
+          <div class="icon-controls">
+            <input
+              type="text"
+              id="iconPromptInput"
+              class="api-input"
+              placeholder="Minimal neon spark, friendly bot..."
+              autocomplete="off"
+              spellcheck="false"
+            />
+            <div class="icon-actions">
+              <button class="save-key-btn" id="generateIconBtn">Generate icon</button>
+              <button class="secondary-btn" id="resetIconBtn">Reset</button>
+            </div>
+          </div>
+        </div>
+        <div class="config-hint" id="iconStatus">Optional — replaces ✦ in the reply bar</div>
+      </div>
+
+    </div>
+
+    <!-- Divider -->
+    <div class="divider"></div>
+
+    <!-- Main Content -->
+    <main class="main">
+
+      <!-- Tone selector -->
+      <div class="section-label">Pick a tone</div>
+      <div class="tones-grid" id="tonesGrid">
+        <button class="tone-btn" data-tone="funny">
+          <span class="tone-emoji">😂</span>
+          <span class="tone-name">Funny</span>
+          <span class="tone-desc">Meme energy</span>
+        </button>
+        <button class="tone-btn" data-tone="insightful">
+          <span class="tone-emoji">🧠</span>
+          <span class="tone-name">Insightful</span>
+          <span class="tone-desc">Smart take</span>
+        </button>
+        <button class="tone-btn" data-tone="curious">
+          <span class="tone-emoji">❓</span>
+          <span class="tone-name">Curious</span>
+          <span class="tone-desc">Ask deeper</span>
+        </button>
+        <button class="tone-btn" data-tone="relatable">
+          <span class="tone-emoji">😤</span>
+          <span class="tone-name">Relatable</span>
+          <span class="tone-desc">Shared pain</span>
+        </button>
+        <button class="tone-btn tone-btn--wide" data-tone="contrarian">
+          <span class="tone-emoji">🔥</span>
+          <span class="tone-name">Contrarian</span>
+          <span class="tone-desc">Hot take</span>
+        </button>
+      </div>
+
+      <!-- Generate button -->
+      <button class="generate-btn" id="generateBtn" disabled>
+        <span class="generate-btn-text" id="generateBtnText">Select a tone</span>
+        <span class="generate-btn-loader" id="generateBtnLoader" style="display:none">
+          <span class="dot-pulse"></span>
+        </span>
+      </button>
+
+      <!-- Result area -->
+      <div class="result-area" id="resultArea" style="display:none">
+        <div class="result-header">
+          <span class="result-label">Generated comment</span>
+          <div class="result-actions">
+            <button class="action-btn" id="copyBtn">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="9" y="9" width="13" height="13" rx="2"/>
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+              </svg>
+              Copy
+            </button>
+            <button class="action-btn action-btn--primary" id="injectBtn">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 5v14M5 12l7 7 7-7"/>
+              </svg>
+              Use it
+            </button>
+          </div>
+        </div>
+        <div class="result-text" id="resultText"></div>
+        <button class="regen-btn" id="regenBtn">↺ Regenerate</button>
+      </div>
+
+      <!-- Error area -->
+      <div class="error-area" id="errorArea" style="display:none">
+        <span class="error-icon">⚠</span>
+        <span id="errorText"></span>
+      </div>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+      Open a Threads post · click Reply · pick a tone
+    </footer>
+
+  </div>
+  <script src="popup.js"></script>
+</body>
+</html>
