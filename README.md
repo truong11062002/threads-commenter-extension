@@ -1,97 +1,114 @@
-# ✦ Threads AI Auto Commenter
+# Threads AI Commenter
 
-A Chrome extension for generating contextual AI comments on Threads with five different tones, using your own OpenAI API key.
+Generate on-brand, context-aware replies on Threads without leaving the reply box.
 
-## Personalization Features
+![Threads AI Commenter preview](assets/threads-ai-preview.svg)
 
-- **Your voice**: save your personal writing style so generated comments sound more like you.
-- **Threads comment strategy**: add a conversation playbook that helps comments invite genuine replies without spam or engagement bait.
-- **Reply icon**: generate a custom icon with the OpenAI Images API and use it in place of the default `✦` symbol on the AI button inside the Threads reply bar.
-- **GPT-5.5 support**: select `gpt-5.5` from the model picker. GPT-5.x models use the OpenAI Responses API, while older GPT-4 models continue using Chat Completions.
+Threads AI Commenter is a Chrome extension for creators, founders, indie hackers, and teams who want to reply faster while keeping their own voice. It reads the active Threads post, lets you choose a comment style, and inserts a short AI-generated reply directly into the Threads reply composer.
+
+## Why It Exists
+
+Building in public works best when you show up consistently. The hard part is not only posting; it is replying with comments that feel specific, useful, and human. This extension helps you turn more conversations into thoughtful replies without sounding generic.
+
+## What You Can Do
+
+- **Reply in your own voice**: save your writing style so comments sound more like you.
+- **Optimize for real conversations**: use a Threads comment strategy that invites meaningful replies without spam or engagement bait.
+- **Pick the right tone**: choose Funny, Insightful, Curious, Relatable, or Contrarian.
+- **Use GPT-5.5**: select `gpt-5.5` for higher-quality replies through the OpenAI Responses API.
+- **Customize the reply button**: generate a custom AI icon for the inline reply-bar button.
+- **Stay in flow**: generate and insert replies directly from the Threads reply box.
+
+## How It Works
+
+1. Open a Threads post.
+2. Click **Reply**.
+3. Click the inline **AI** button or open the extension popup.
+4. Choose a tone.
+5. Review, insert, or copy the generated reply.
+
+The extension uses your own OpenAI API key. Your key and personalization settings are stored locally in `chrome.storage.local`.
+
+## Who It Is For
+
+- Indie hackers building in public
+- Founders replying to customers and community members
+- Creators who want faster, more consistent engagement
+- Growth teams testing comment styles on Threads
+- Solo builders who want useful replies without sounding automated
 
 ## Tones Available
 
-| Tone | Style |
-|------|-------|
-| 😂 Funny / Meme | Internet humor, meme culture, witty one-liners |
-| 🧠 Insightful | Smart takes, connects to the bigger picture |
-| ❓ Curious | Interesting follow-up questions |
-| 😤 Relatable | Shared experience, "me too" energy |
-| 🔥 Contrarian | Respectful hot takes that challenge assumptions |
+| Tone | Best For |
+|------|----------|
+| Funny / Meme | Light replies, internet humor, punchy one-liners |
+| Insightful | Smart observations and added context |
+| Curious | Follow-up questions that invite real conversation |
+| Relatable | Warm, human, shared-experience comments |
+| Contrarian | Respectful counterpoints and fresh angles |
+
+## Installation
+
+1. Download or clone this repository.
+2. Open Chrome and go to `chrome://extensions/`.
+3. Turn on **Developer mode**.
+4. Click **Load unpacked**.
+5. Select this project folder.
 
 ## Setup
 
-### 1. Install The Extension
+1. Click the extension icon in the Chrome toolbar.
+2. Paste your OpenAI API key.
+3. Choose your preferred model.
+4. Add your personal voice in **Your voice**.
+5. Adjust **Threads comment strategy** if you want a different reply style.
+6. Optionally generate a custom **Reply icon**.
 
-1. Open Chrome and go to `chrome://extensions/`
-2. Turn on **Developer mode**
-3. Click **Load unpacked**
-4. Select the `threads-commenter-store` folder
+## Models
 
-### 2. Add Your API Key
+- Default: `gpt-4o-mini`
+- Higher quality: `gpt-5.5`
+- Other supported options: `gpt-4o`, `gpt-4.1`, `gpt-4.1-mini`, `gpt-4.1-nano`
 
-1. Click the extension icon in the Chrome toolbar
-2. Paste your OpenAI API key (`sk-proj-...`)
-3. Click **Save**
+GPT-5.x models use the OpenAI Responses API. Older GPT-4 models continue using Chat Completions.
 
-Your key is stored in `chrome.storage.local` on your machine. It is only sent to OpenAI for generation requests.
+## Privacy
 
-### 3. Personalize Voice, Strategy, And Icon
-
-1. In **Your voice**, describe how you naturally talk, then click **Save voice**
-2. Adjust **Threads comment strategy** if you want comments that are more likely to start real conversations
-3. Toggle **Optimize for replies** on or off as needed
-4. In **Reply icon**, describe the icon you want for the inline AI button
-5. Click **Generate icon** to create a new icon for the Threads reply bar
-6. Click **Reset** to return to the default `✦` icon
-
-### 4. Use It
-
-1. Open [threads.net](https://threads.net) or [threads.com](https://threads.com)
-2. Open a post you want to comment on
-3. Click **Reply** to open the reply box
-4. Pick a model, choose a tone, and click **Generate comment**
-5. Use **Use it** to insert the comment into the reply box, or **Copy** to paste manually
-
-You can also use the **AI** button injected directly beside the icons in the Threads reply box. That button uses your saved API key, model, voice, strategy, and custom reply icon.
-
-## Cost Estimate
-
-- Default model: `gpt-4o-mini`
-- High-quality option: `gpt-5.5`
-- Around 150 tokens per comment
-- Roughly $0.001 per comment
-- Around $1 per 1,000 comments
-
-Image generation costs depend on the OpenAI image model and settings used.
+- Your OpenAI API key is stored locally.
+- Your voice, strategy, and icon settings are stored locally.
+- Post text is sent to OpenAI only when you generate a reply.
+- No external analytics or tracking are included.
 
 ## Troubleshooting
 
-**"Refresh the Threads page"** → Reload the Threads tab, then try the extension again.
+**No post text found**  
+Open a single Threads post page, then try again.
 
-**"Click Reply on a post first"** → Open a reply box before inserting a generated comment.
+**No reply box found**  
+Click **Reply** on the post before using **Use it** or the inline AI button.
 
-**"Could not detect post text"** → Open the single-post view instead of using the feed view.
+**Icon generation fails**  
+Check your API key, OpenAI account limits, and image model availability.
 
-**Icon generation fails** → Check your API key, image model availability, and OpenAI account limits.
+**The AI button does not appear**  
+Refresh the Threads page and open the reply box again.
 
-## File Structure
+## Project Structure
 
 ```text
 threads-commenter-store/
-├── manifest.json     # Extension config (Manifest V3)
-├── background.js     # Service worker for OpenAI API calls
-├── content.js        # Injected into Threads for DOM interaction
+├── assets/
+│   └── threads-ai-preview.svg
+├── manifest.json
+├── background.js
+├── content.js
+├── icons/
 └── popup/
-    ├── popup.html    # Extension popup UI
-    ├── popup.css     # Dark editorial styling
-    └── popup.js      # Popup logic and local state
+    ├── popup.html
+    ├── popup.css
+    └── popup.js
 ```
 
-## Technical Notes
+## License
 
-- **Manifest V3**: uses a service worker instead of a background page.
-- **No external dependencies**: vanilla JavaScript, no build step.
-- **React DOM compatibility**: uses `execCommand` to trigger React-compatible text insertion.
-- **API key security**: stored in `chrome.storage.local`, never hardcoded.
-- **Personalization storage**: `userVoice`, `viralStrategy`, `useViralStrategy`, `replyIconPrompt`, and `replyIconDataUrl` are stored locally.
+This project is licensed under the terms in [LICENSE](LICENSE).
