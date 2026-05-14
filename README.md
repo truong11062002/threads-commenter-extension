@@ -2,7 +2,7 @@
 
 Generate on-brand, context-aware replies on Threads without leaving the reply box.
 
-![Threads AI Commenter preview](assets/threads-ai-preview.svg)
+<a href="https://postimg.cc/gxg7CtLQ" target="_blank"><img src="https://i.postimg.cc/DzhKbtvv/image.png" border="0" alt="Threads AI Commenter preview"></a>
 
 Threads AI Commenter is a Chrome extension for creators, founders, indie hackers, and teams who want to reply faster while keeping their own voice. It reads the active Threads post, lets you choose a comment style, and inserts a short AI-generated reply directly into the Threads reply composer.
 
@@ -97,8 +97,6 @@ Refresh the Threads page and open the reply box again.
 
 ```text
 threads-commenter-store/
-├── assets/
-│   └── threads-ai-preview.svg
 ├── manifest.json
 ├── background.js
 ├── content.js
