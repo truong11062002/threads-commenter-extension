@@ -48,7 +48,9 @@ const HUMAN_COMMENT_STYLE_PROMPT = `
 Human mobile reply style:
 - Write like a real person typing on a phone on X or Threads.
 - Keep the wording casual, direct, and slightly imperfect when it feels natural.
-- Use short lines. Put a blank line between every sentence or thought.
+- Keep every comment short, easy to understand, and clear at a glance.
+- Use one simple sentence or thought per line.
+- Put exactly one blank line between every sentence or thought so the reply is easy to scan.
 - Do not use bullet points, numbered lists, markdown, hashtags, or headings.
 - Avoid AI-sounding phrases like "That's a great point", "I completely agree", "This is such an important reminder", or "In today's world".
 - Do not use hyphen-led clauses, em dashes, or list-style "-" formatting.

@@ -14,7 +14,7 @@ Building in public works best when you show up consistently. The hard part is no
 
 - **Reply in your own voice**: save your writing style so comments sound more like you.
 - **Optimize for real conversations**: use a Threads comment strategy that invites meaningful replies without spam or engagement bait.
-- **Sound human on mobile**: comments use short, natural lines with blank space between thoughts, like real replies on X or Threads.
+- **Sound human on mobile**: comments stay short, clear, and easy to scan, with a blank line between each sentence or thought.
 - **Pick the right tone**: choose Funny, Insightful, Curious, Relatable, or Contrarian.
 - **Use GPT-5.5**: select `gpt-5.5` for higher-quality replies through the OpenAI Responses API.
 - **Customize the reply button**: generate a custom AI icon for the inline reply-bar button.
