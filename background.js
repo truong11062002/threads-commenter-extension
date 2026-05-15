@@ -47,13 +47,21 @@ const HUMAN_COMMENT_STYLE_PROMPT = `
 
 Human mobile reply style:
 - Write like a real person typing on a phone on X or Threads.
+- Goal: help a small X or Threads account grow from 0 to 300 followers through real human interaction.
+- Write in all lowercase. Never capitalize the first letter of a sentence.
 - Keep the wording casual, direct, and slightly imperfect when it feels natural.
 - Keep every comment short, easy to understand, and clear at a glance.
+- Write 1 to 3 short sentences.
 - Use one simple sentence or thought per line.
 - Put exactly one blank line between every sentence or thought so the reply is easy to scan.
 - Do not use bullet points, numbered lists, markdown, hashtags, or headings.
-- Avoid AI-sounding phrases like "That's a great point", "I completely agree", "This is such an important reminder", or "In today's world".
-- Do not use hyphen-led clauses, em dashes, or list-style "-" formatting.
+- Do not use emoji.
+- Do not use hyphens, bullet-like formatting, or list structures.
+- Write from a real observation or personal experience.
+- Do not fully wrap up the thought. Leave it slightly open, unfinished, or add another angle.
+- Tone: blunt, relatable, and not trying to sound smart.
+- It can feel like a natural thought, slightly messy, or cut off mid-thought if that sounds human.
+- Avoid AI-sounding phrases like "that's a great point", "i completely agree", "this is such an important reminder", "in today's world", "exactly", "honestly", "definitely", "absolutely", or "dive into".
 - Do not over-explain. Make it feel like a human reply, not a polished essay.`;
 
 // Listen for messages from popup or content script
@@ -210,11 +218,13 @@ function formatHumanComment(rawComment) {
 
   const cleaned = rawComment
     .trim()
+    .toLowerCase()
     .replace(/\r\n/g, "\n")
     .replace(/^[ \t]*[-*•][ \t]+/gm, "")
     .replace(/([.!?])\s+-\s+/g, "$1\n")
     .replace(/[ \t]*[—–][ \t]*/g, ", ")
     .replace(/[ \t]+-[ \t]+/g, ", ")
+    .replace(/\b(that'?s a great point|this is a great point|i completely agree|this is such an important reminder|in today'?s world|exactly|honestly|definitely|absolutely|dive into)\b[,.!?]?\s*/gi, "")
     .replace(/[ \t]+/g, " ")
     .replace(/\n{3,}/g, "\n\n");
 
@@ -226,7 +236,7 @@ function formatHumanComment(rawComment) {
 
   if (chunks.length === 0) return null;
 
-  return chunks.join("\n\n");
+  return chunks.slice(0, 3).join("\n\n");
 }
 
 function splitIntoSentenceLikeChunks(text) {

@@ -7,12 +7,15 @@ let currentPostText = null;
 let activeTabId = null;
 
 const DEFAULT_VIRAL_STRATEGY = [
-  "Optimize for meaningful Threads replies, not cheap engagement bait.",
-  "Write a comment that is specific to the post and gives people an easy reason to reply.",
-  "Prefer one sharp observation, useful reframing, or thoughtful follow-up question.",
-  "If asking a question, make it concrete and non-generic.",
-  "Avoid spam, hashtags, emoji-only reactions, vague praise, rage bait, and obvious bait like 'agree?'.",
-  "Keep it short enough to feel native to Threads.",
+  "Goal: grow a small X or Threads account from 0 to 300 followers through real human replies.",
+  "Write a short comment in all lowercase.",
+  "Use 1 to 3 short sentences.",
+  "Put one blank line between every sentence or thought.",
+  "Sound like a real observation from personal experience.",
+  "Do not use emoji, hashtags, bullets, hyphens, or list structures.",
+  "Do not fully conclude the thought; leave it slightly open or add another angle.",
+  "Tone: blunt, relatable, and not trying to sound smart.",
+  "Avoid: exactly, honestly, definitely, absolutely, dive into.",
 ].join("\n");
 
 const el = {
