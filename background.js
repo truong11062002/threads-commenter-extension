@@ -43,6 +43,17 @@ Use the same language as the post.`,
   },
 };
 
+const HUMAN_COMMENT_STYLE_PROMPT = `
+
+Human mobile reply style:
+- Write like a real person typing on a phone on X or Threads.
+- Keep the wording casual, direct, and slightly imperfect when it feels natural.
+- Use short lines. Put a blank line between every sentence or thought.
+- Do not use bullet points, numbered lists, markdown, hashtags, or headings.
+- Avoid AI-sounding phrases like "That's a great point", "I completely agree", "This is such an important reminder", or "In today's world".
+- Do not use hyphen-led clauses, em dashes, or list-style "-" formatting.
+- Do not over-explain. Make it feel like a human reply, not a polished essay.`;
+
 // Listen for messages from popup or content script
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.type === "GENERATE_COMMENT") {
@@ -107,7 +118,7 @@ async function handleGenerateComment(request, sendResponse) {
         body: JSON.stringify({
           model,
           max_output_tokens: 150,
-          instructions: config.systemPrompt + voiceInstruction + viralInstruction,
+          instructions: config.systemPrompt + voiceInstruction + viralInstruction + HUMAN_COMMENT_STYLE_PROMPT,
           input: `Here is the Threads post to comment on:\n\n"${postText}"\n\nWrite your comment now. Just the comment text, nothing else.`,
         }),
       });
@@ -119,7 +130,7 @@ async function handleGenerateComment(request, sendResponse) {
       }
 
       const data = await response.json();
-      const comment = extractResponseText(data);
+      const comment = formatHumanComment(extractResponseText(data));
 
       if (!comment) {
         sendResponse({ error: "Empty response from AI. Try again." });
@@ -143,7 +154,7 @@ async function handleGenerateComment(request, sendResponse) {
         messages: [
           {
             role: "system",
-            content: config.systemPrompt + voiceInstruction + viralInstruction,
+            content: config.systemPrompt + voiceInstruction + viralInstruction + HUMAN_COMMENT_STYLE_PROMPT,
           },
           {
             role: "user",
@@ -160,7 +171,7 @@ async function handleGenerateComment(request, sendResponse) {
     }
 
     const data = await response.json();
-    const comment = data.choices?.[0]?.message?.content?.trim();
+    const comment = formatHumanComment(data.choices?.[0]?.message?.content);
 
     if (!comment) {
       sendResponse({ error: "Empty response from AI. Try again." });
@@ -190,6 +201,39 @@ function extractResponseText(data) {
     ?.trim();
 
   return outputText || null;
+}
+
+function formatHumanComment(rawComment) {
+  if (!rawComment || typeof rawComment !== "string") return null;
+
+  const cleaned = rawComment
+    .trim()
+    .replace(/\r\n/g, "\n")
+    .replace(/^[ \t]*[-*•][ \t]+/gm, "")
+    .replace(/([.!?])\s+-\s+/g, "$1\n")
+    .replace(/[ \t]*[—–][ \t]*/g, ", ")
+    .replace(/[ \t]+-[ \t]+/g, ", ")
+    .replace(/[ \t]+/g, " ")
+    .replace(/\n{3,}/g, "\n\n");
+
+  const chunks = cleaned
+    .split(/\n+/)
+    .map(line => line.trim())
+    .filter(Boolean)
+    .flatMap(line => splitIntoSentenceLikeChunks(line));
+
+  if (chunks.length === 0) return null;
+
+  return chunks.join("\n\n");
+}
+
+function splitIntoSentenceLikeChunks(text) {
+  const pieces = text
+    .split(/(?<=[.!?])\s+/)
+    .map(piece => piece.trim())
+    .filter(Boolean);
+
+  return pieces.length > 0 ? pieces : [text];
 }
 
 async function handleGenerateReplyIcon(request, sendResponse) {
