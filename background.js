@@ -64,15 +64,25 @@ Human mobile reply style:
 - Avoid AI-sounding phrases like "that's a great point", "i completely agree", "this is such an important reminder", "in today's world", "exactly", "honestly", "definitely", "absolutely", or "dive into".
 - Do not over-explain. Make it feel like a human reply, not a polished essay.`;
 
+const X_ALGORITHM_GROWTH_PROMPT = `
+
+X-style ranking strategy adapted for Threads:
+- Optimize for real engagement signals: replies, likes, repost/share intent, profile clicks, dwell, and follow intent.
+- Avoid negative signals: spammy repetition, copied/pasted wording, generic praise, rage bait, blocks, mutes, reports, and "not interested" reactions.
+- Do not chase viral bait. Write the kind of reply that makes a real person pause, read, and maybe check the profile.
+- Use author diversity: do not sound like the same reply under every post. Each comment must be specific to the original post.
+
+Follower milestone strategy:
+- 0 to 300 followers: earn trust and profile clicks. Reply with relatable observations, tiny personal experiences, and clear niche identity. Be easy to understand.
+- 300 to 1000 followers: create repeatable angles people recognize. Add sharper observations, useful disagreement, or a concrete follow-up that invites replies.
+- 1000 to 5000 followers: act more like a signal source. Add concise frameworks, pattern recognition, or lived lessons while keeping the tone human and not polished.
+
+For every milestone, the best reply is short, specific, human, and conversation-worthy.`;
+
 // Listen for messages from popup or content script
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.type === "GENERATE_COMMENT") {
     handleGenerateComment(request, sendResponse);
-    return true; // Keep channel open for async response
-  }
-
-  if (request.type === "GENERATE_REPLY_ICON") {
-    handleGenerateReplyIcon(request, sendResponse);
     return true; // Keep channel open for async response
   }
 
@@ -128,7 +138,7 @@ async function handleGenerateComment(request, sendResponse) {
         body: JSON.stringify({
           model,
           max_output_tokens: 150,
-          instructions: config.systemPrompt + voiceInstruction + viralInstruction + HUMAN_COMMENT_STYLE_PROMPT,
+          instructions: config.systemPrompt + voiceInstruction + viralInstruction + HUMAN_COMMENT_STYLE_PROMPT + X_ALGORITHM_GROWTH_PROMPT,
           input: `Here is the Threads post to comment on:\n\n"${postText}"\n\nWrite your comment now. Just the comment text, nothing else.`,
         }),
       });
@@ -164,7 +174,7 @@ async function handleGenerateComment(request, sendResponse) {
         messages: [
           {
             role: "system",
-            content: config.systemPrompt + voiceInstruction + viralInstruction + HUMAN_COMMENT_STYLE_PROMPT,
+            content: config.systemPrompt + voiceInstruction + viralInstruction + HUMAN_COMMENT_STYLE_PROMPT + X_ALGORITHM_GROWTH_PROMPT,
           },
           {
             role: "user",
@@ -246,66 +256,6 @@ function splitIntoSentenceLikeChunks(text) {
     .filter(Boolean);
 
   return pieces.length > 0 ? pieces : [text];
-}
-
-async function handleGenerateReplyIcon(request, sendResponse) {
-  const { apiKey } = request;
-  const iconPrompt = typeof request.prompt === "string" ? request.prompt.trim() : "";
-
-  if (!apiKey) {
-    sendResponse({ error: "No API key set. Please add your OpenAI key first." });
-    return;
-  }
-
-  if (iconPrompt.length < 3) {
-    sendResponse({ error: "Describe the icon you want first." });
-    return;
-  }
-
-  const prompt = [
-    "Create a simple, polished app icon for a Chrome extension button on Threads.",
-    "The icon must work at 16-24px, use a clean centered symbol, no text, no letters, no watermark.",
-    "Prefer transparent background if supported; otherwise use a simple high-contrast background.",
-    `User idea: ${iconPrompt}`,
-  ].join("\n");
-
-  try {
-    const response = await fetch("https://api.openai.com/v1/images/generations", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: request.imageModel || "gpt-image-1",
-        prompt,
-        n: 1,
-        size: "1024x1024",
-        quality: "low",
-        output_format: "png",
-        background: "transparent",
-      }),
-    });
-
-    if (!response.ok) {
-      const err = await readOpenAIError(response);
-      sendResponse({ error: `OpenAI image error: ${err.error?.message || response.statusText}` });
-      return;
-    }
-
-    const data = await response.json();
-    const image = data.data?.[0];
-    const base64 = image?.b64_json;
-
-    if (!base64) {
-      sendResponse({ error: "OpenAI did not return an image. Try a simpler icon prompt." });
-      return;
-    }
-
-    sendResponse({ iconDataUrl: `data:image/png;base64,${base64}` });
-  } catch (err) {
-    sendResponse({ error: `Network error: ${err.message}` });
-  }
 }
 
 async function readOpenAIError(response) {

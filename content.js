@@ -11,18 +11,13 @@ const TONES = [
   { key: "contrarian",emoji: "🔥", label: "Contrarian", desc: "Hot take" },
 ];
 
-let currentReplyIconDataUrl = null;
-
 const DEFAULT_VIRAL_STRATEGY = [
-  "Goal: grow a small X or Threads account from 0 to 300 followers through real human replies.",
-  "Write a short comment in all lowercase.",
-  "Use 1 to 3 short sentences.",
-  "Put one blank line between every sentence or thought.",
-  "Sound like a real observation from personal experience.",
-  "Do not use emoji, hashtags, bullets, hyphens, or list structures.",
-  "Do not fully conclude the thought; leave it slightly open or add another angle.",
-  "Tone: blunt, relatable, and not trying to sound smart.",
-  "Avoid: exactly, honestly, definitely, absolutely, dive into.",
+  "Use X-style ranking signals as inspiration for Threads replies: replies, likes, repost/share intent, profile clicks, dwell, and follow intent.",
+  "Avoid negative signals: spammy repetition, copied wording, generic praise, rage bait, blocks, mutes, reports, and not-interested reactions.",
+  "0 to 300 followers: earn trust and profile clicks with relatable observations, tiny personal experiences, and clear niche identity.",
+  "300 to 1000 followers: build recognizable angles with sharper observations, useful disagreement, or concrete follow-ups.",
+  "1000 to 5000 followers: become a concise signal source with pattern recognition, simple frameworks, or lived lessons.",
+  "Every reply must be short, lowercase, specific to the post, human, and easy to scan.",
 ].join("\n");
 
 // ─── DOM Helpers ──────────────────────────────────────────────────────────────
@@ -144,24 +139,6 @@ function injectStyles() {
       opacity: 0.6;
       cursor: wait;
     }
-    .tai-btn-symbol {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      width: 14px;
-      height: 14px;
-      line-height: 1;
-      flex-shrink: 0;
-    }
-    .tai-btn-icon {
-      display: block;
-      width: 16px;
-      height: 16px;
-      border-radius: 4px;
-      object-fit: cover;
-      flex-shrink: 0;
-    }
-
     /* Tone picker panel */
     .tai-panel {
       position: absolute;
@@ -259,33 +236,6 @@ function closePanel() {
   activePanel = null;
 }
 
-function renderAIButtonContent(btn, iconDataUrl = currentReplyIconDataUrl) {
-  btn.textContent = "";
-
-  if (iconDataUrl) {
-    const img = document.createElement("img");
-    img.className = "tai-btn-icon";
-    img.alt = "";
-    img.src = iconDataUrl;
-    img.addEventListener("error", () => renderAIButtonContent(btn, null), { once: true });
-    btn.appendChild(img);
-  } else {
-    const symbol = document.createElement("span");
-    symbol.className = "tai-btn-symbol";
-    symbol.textContent = "✦";
-    btn.appendChild(symbol);
-  }
-
-  const label = document.createElement("span");
-  label.textContent = "AI";
-  btn.appendChild(label);
-}
-
-function updateInjectedButtonIcons(iconDataUrl) {
-  currentReplyIconDataUrl = iconDataUrl || null;
-  document.querySelectorAll(".tai-btn").forEach(btn => renderAIButtonContent(btn));
-}
-
 function injectAIButton(replyBox) {
   // Don't inject twice
   if (replyBox.parentElement?.querySelector(".tai-btn")) return;
@@ -296,16 +246,10 @@ function injectAIButton(replyBox) {
   const btn = document.createElement("button");
   btn.className = "tai-btn";
   btn.title = "Generate AI comment";
-  renderAIButtonContent(btn);
+  btn.innerHTML = `<span>✦</span><span>AI</span>`;
 
   // Insert as first child of icon row
   iconRow.insertBefore(btn, iconRow.firstChild);
-
-  chrome.storage.local.get("replyIconDataUrl").then(({ replyIconDataUrl }) => {
-    if (replyIconDataUrl && replyIconDataUrl !== currentReplyIconDataUrl) {
-      updateInjectedButtonIcons(replyIconDataUrl);
-    }
-  }).catch(() => {});
 
   btn.addEventListener("click", (e) => {
     e.stopPropagation();
@@ -453,16 +397,6 @@ function showPanelError(panel, msg) {
 // ─── Observer: watch for reply boxes appearing ────────────────────────────────
 
 injectStyles();
-
-chrome.storage.local.get("replyIconDataUrl").then(({ replyIconDataUrl }) => {
-  currentReplyIconDataUrl = replyIconDataUrl || null;
-  updateInjectedButtonIcons(currentReplyIconDataUrl);
-}).catch(() => {});
-
-chrome.storage.onChanged.addListener((changes, areaName) => {
-  if (areaName !== "local" || !changes.replyIconDataUrl) return;
-  updateInjectedButtonIcons(changes.replyIconDataUrl.newValue || null);
-});
 
 // Debounce — prevents hammering on rapid DOM mutations
 function debounce(fn, ms) {

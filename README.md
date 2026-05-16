@@ -14,10 +14,10 @@ Building in public works best when you show up consistently. The hard part is no
 
 - **Reply in your own voice**: save your writing style so comments sound more like you.
 - **Optimize for real conversations**: use a Threads comment strategy that invites meaningful replies without spam or engagement bait.
+- **Grow by milestone**: apply X-style engagement signals for `0 -> 300`, `300 -> 1000`, and `1000 -> 5000` follower stages.
 - **Sound human on mobile**: comments stay lowercase, short, blunt, clear, and easy to scan, with a blank line between each sentence or thought.
 - **Pick the right tone**: choose Funny, Insightful, Curious, Relatable, or Contrarian.
 - **Use GPT-5.5**: select `gpt-5.5` for higher-quality replies through the OpenAI Responses API.
-- **Customize the reply button**: generate a custom AI icon for the inline reply-bar button.
 - **Stay in flow**: generate and insert replies directly from the Threads reply box.
 
 ## How It Works
@@ -48,6 +48,16 @@ The extension uses your own OpenAI API key. Your key and personalization setting
 | Relatable | Warm, human, shared-experience comments |
 | Contrarian | Respectful counterpoints and fresh angles |
 
+## Growth Strategy
+
+The default strategy is inspired by X-style ranking signals from `xai-org/x-algorithm`: replies, likes, repost/share intent, profile clicks, dwell, and follow intent. It also avoids negative signals such as spammy repetition, copied wording, generic praise, rage bait, blocks, mutes, reports, and not-interested reactions.
+
+| Milestone | Comment Strategy |
+|-----------|------------------|
+| `0 -> 300` | Earn trust and profile clicks with relatable observations, tiny personal experiences, and clear niche identity |
+| `300 -> 1000` | Build recognizable angles with sharper observations, useful disagreement, or concrete follow-ups |
+| `1000 -> 5000` | Become a concise signal source with pattern recognition, simple frameworks, or lived lessons |
+
 ## Installation
 
 1. Download or clone this repository.
@@ -63,7 +73,6 @@ The extension uses your own OpenAI API key. Your key and personalization setting
 3. Choose your preferred model.
 4. Add your personal voice in **Your voice**.
 5. Adjust **Threads comment strategy** if you want a different reply style.
-6. Optionally generate a custom **Reply icon**.
 
 ## Models
 
@@ -76,7 +85,7 @@ GPT-5.x models use the OpenAI Responses API. Older GPT-4 models continue using C
 ## Privacy
 
 - Your OpenAI API key is stored locally.
-- Your voice, strategy, and icon settings are stored locally.
+- Your voice and strategy settings are stored locally.
 - Post text is sent to OpenAI only when you generate a reply.
 - No external analytics or tracking are included.
 
@@ -87,9 +96,6 @@ Open a single Threads post page, then try again.
 
 **No reply box found**  
 Click **Reply** on the post before using **Use it** or the inline AI button.
-
-**Icon generation fails**  
-Check your API key, OpenAI account limits, and image model availability.
 
 **The AI button does not appear**  
 Refresh the Threads page and open the reply box again.

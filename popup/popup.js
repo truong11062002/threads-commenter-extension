@@ -2,20 +2,16 @@
 
 let selectedTone = null;
 let isLoading = false;
-let isIconLoading = false;
 let currentPostText = null;
 let activeTabId = null;
 
 const DEFAULT_VIRAL_STRATEGY = [
-  "Goal: grow a small X or Threads account from 0 to 300 followers through real human replies.",
-  "Write a short comment in all lowercase.",
-  "Use 1 to 3 short sentences.",
-  "Put one blank line between every sentence or thought.",
-  "Sound like a real observation from personal experience.",
-  "Do not use emoji, hashtags, bullets, hyphens, or list structures.",
-  "Do not fully conclude the thought; leave it slightly open or add another angle.",
-  "Tone: blunt, relatable, and not trying to sound smart.",
-  "Avoid: exactly, honestly, definitely, absolutely, dive into.",
+  "Use X-style ranking signals as inspiration for Threads replies: replies, likes, repost/share intent, profile clicks, dwell, and follow intent.",
+  "Avoid negative signals: spammy repetition, copied wording, generic praise, rage bait, blocks, mutes, reports, and not-interested reactions.",
+  "0 to 300 followers: earn trust and profile clicks with relatable observations, tiny personal experiences, and clear niche identity.",
+  "300 to 1000 followers: build recognizable angles with sharper observations, useful disagreement, or concrete follow-ups.",
+  "1000 to 5000 followers: become a concise signal source with pattern recognition, simple frameworks, or lived lessons.",
+  "Every reply must be short, lowercase, specific to the post, human, and easy to scan.",
 ].join("\n");
 
 const el = {
@@ -30,11 +26,6 @@ const el = {
   useViralStrategyToggle: document.getElementById("useViralStrategyToggle"),
   resetStrategyBtn:  document.getElementById("resetStrategyBtn"),
   strategyStatus:    document.getElementById("strategyStatus"),
-  iconPromptInput:   document.getElementById("iconPromptInput"),
-  generateIconBtn:   document.getElementById("generateIconBtn"),
-  resetIconBtn:      document.getElementById("resetIconBtn"),
-  iconPreview:       document.getElementById("iconPreview"),
-  iconStatus:        document.getElementById("iconStatus"),
   tonesGrid:         document.getElementById("tonesGrid"),
   generateBtn:       document.getElementById("generateBtn"),
   generateBtnText:   document.getElementById("generateBtnText"),
@@ -50,22 +41,20 @@ const el = {
 
 // ─── Init ─────────────────────────────────────────────────────
 async function init() {
+  chrome.storage.local.remove(["replyIconPrompt", "replyIconDataUrl"]).catch(() => {});
+
   const {
     openaiKey,
     openaiModel,
     userVoice,
     viralStrategy,
     useViralStrategy,
-    replyIconPrompt,
-    replyIconDataUrl,
   } = await chrome.storage.local.get([
     "openaiKey",
     "openaiModel",
     "userVoice",
     "viralStrategy",
     "useViralStrategy",
-    "replyIconPrompt",
-    "replyIconDataUrl",
   ]);
 
   if (openaiKey) {
@@ -88,19 +77,9 @@ async function init() {
   el.viralStrategyInput.value = viralStrategy || DEFAULT_VIRAL_STRATEGY;
   el.useViralStrategyToggle.checked = useViralStrategy !== false;
   el.strategyStatus.textContent = el.useViralStrategyToggle.checked
-    ? "Active — AI will optimize for meaningful replies"
+    ? "Active — AI will optimize with X-style growth signals"
     : "Paused — AI will use tone and voice only";
   el.strategyStatus.classList.toggle("saved", el.useViralStrategyToggle.checked);
-
-  if (replyIconPrompt) {
-    el.iconPromptInput.value = replyIconPrompt;
-  }
-
-  renderIconPreview(replyIconDataUrl);
-  if (replyIconDataUrl) {
-    el.iconStatus.textContent = "Saved — visible in the Threads reply bar";
-    el.iconStatus.classList.add("saved");
-  }
 
   // Get active tab
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -163,67 +142,9 @@ async function saveViralStrategy() {
   const useViralStrategy = el.useViralStrategyToggle.checked;
   await chrome.storage.local.set({ viralStrategy, useViralStrategy });
   el.strategyStatus.textContent = useViralStrategy
-    ? "Active — AI will optimize for meaningful replies"
+    ? "Active — AI will optimize with X-style growth signals"
     : "Paused — AI will use tone and voice only";
   el.strategyStatus.classList.toggle("saved", useViralStrategy);
-  hideError();
-}
-
-// ─── Reply Icon ───────────────────────────────────────────────
-el.generateIconBtn.addEventListener("click", generateReplyIcon);
-el.resetIconBtn.addEventListener("click", resetReplyIcon);
-
-async function generateReplyIcon() {
-  if (isIconLoading) return;
-
-  const { openaiKey } = await chrome.storage.local.get("openaiKey");
-  if (!openaiKey) { showError("Add your OpenAI API key above first."); return; }
-
-  const prompt = el.iconPromptInput.value.trim();
-  if (!prompt) { showError("Describe the reply icon you want first."); return; }
-
-  setIconLoading(true);
-  hideError();
-  el.iconStatus.textContent = "Generating icon...";
-  el.iconStatus.classList.remove("saved");
-
-  let response;
-  try {
-    response = await chrome.runtime.sendMessage({
-      type: "GENERATE_REPLY_ICON",
-      apiKey: openaiKey,
-      prompt,
-    });
-  } catch (err) {
-    response = { error: "Extension error: " + err.message };
-  }
-
-  setIconLoading(false);
-
-  if (!response || response.error) {
-    el.iconStatus.textContent = "Icon was not changed";
-    showError(response?.error || "No response from the extension background worker.");
-    return;
-  }
-
-  const iconDataUrl = await resizeIconDataUrl(response.iconDataUrl);
-
-  await chrome.storage.local.set({
-    replyIconPrompt: prompt,
-    replyIconDataUrl: iconDataUrl,
-  });
-
-  renderIconPreview(iconDataUrl);
-  el.iconStatus.textContent = "Saved — visible in the Threads reply bar";
-  el.iconStatus.classList.add("saved");
-}
-
-async function resetReplyIcon() {
-  await chrome.storage.local.remove(["replyIconPrompt", "replyIconDataUrl"]);
-  el.iconPromptInput.value = "";
-  renderIconPreview(null);
-  el.iconStatus.textContent = "Reset — using default ✦ icon";
-  el.iconStatus.classList.remove("saved");
   hideError();
 }
 
@@ -338,43 +259,6 @@ function setLoading(state) {
   el.generateBtn.disabled = state;
   el.generateBtnText.style.display = state ? "none" : "";
   el.generateBtnLoader.style.display = state ? "flex" : "none";
-}
-
-function setIconLoading(state) {
-  isIconLoading = state;
-  el.generateIconBtn.disabled = state;
-  el.resetIconBtn.disabled = state;
-  el.generateIconBtn.textContent = state ? "Generating..." : "Generate icon";
-}
-
-function renderIconPreview(iconDataUrl) {
-  el.iconPreview.textContent = "";
-  if (iconDataUrl) {
-    const img = document.createElement("img");
-    img.src = iconDataUrl;
-    img.alt = "Reply icon preview";
-    img.addEventListener("error", () => renderIconPreview(null), { once: true });
-    el.iconPreview.appendChild(img);
-    return;
-  }
-  el.iconPreview.textContent = "✦";
-}
-
-function resizeIconDataUrl(iconDataUrl) {
-  return new Promise((resolve) => {
-    const img = new Image();
-    img.onload = () => {
-      const canvas = document.createElement("canvas");
-      canvas.width = 128;
-      canvas.height = 128;
-      const ctx = canvas.getContext("2d");
-      ctx.clearRect(0, 0, 128, 128);
-      ctx.drawImage(img, 0, 0, 128, 128);
-      resolve(canvas.toDataURL("image/webp", 0.9));
-    };
-    img.onerror = () => resolve(iconDataUrl);
-    img.src = iconDataUrl;
-  });
 }
 
 // ─── Error ────────────────────────────────────────────────────
