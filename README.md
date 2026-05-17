@@ -17,7 +17,7 @@ Building in public works best when you show up consistently. The hard part is no
 - **Grow by milestone**: apply X-style engagement signals for `0 -> 300`, `300 -> 1000`, and `1000 -> 5000` follower stages.
 - **Build personal brand**: replies aim to be useful, positive, grounded, and consistent with your values and niche.
 - **Sound human on mobile**: comments stay lowercase, short, blunt, clear, and easy to scan, with a blank line between each sentence or thought.
-- **Pick the right tone**: choose Funny, Insightful, Curious, Relatable, or Contrarian.
+- **Pick the right tone**: choose Simple, Funny, Insightful, Curious, Relatable, or Contrarian.
 - **Use GPT-5.5**: select `gpt-5.5` for higher-quality replies through the OpenAI Responses API.
 - **Stay in flow**: generate and insert replies directly from the Threads reply box.
 
@@ -43,6 +43,7 @@ The extension uses your own OpenAI API key. Your key and personalization setting
 
 | Tone | Best For |
 |------|----------|
+| Simple | Clear, useful replies that are easy to understand |
 | Funny / Meme | Light replies, internet humor, punchy one-liners |
 | Insightful | Smart observations and added context |
 | Curious | Follow-up questions that invite real conversation |
@@ -76,6 +77,8 @@ Every generated reply is also guided to support personal branding: useful to the
 3. Choose your preferred model.
 4. Add your personal voice in **Your voice**.
 5. Adjust **Threads comment strategy** if you want a different reply style.
+
+The default voice uses positive energy, celebrates other people's wins, shares relevant personal experience, stays open to connection or collaboration, and occasionally adds a light joke when it fits.
 
 ## Models
 

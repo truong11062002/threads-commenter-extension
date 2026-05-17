@@ -5,6 +5,15 @@ let isLoading = false;
 let currentPostText = null;
 let activeTabId = null;
 
+const DEFAULT_USER_VOICE = [
+  "positive energy, grounded and encouraging",
+  "congratulate people when they share a win or make progress",
+  "share small personal experiences when relevant",
+  "show openness to connect, collaborate, or learn from each other",
+  "keep the reply useful and human, not salesy",
+  "occasionally add a small light joke when it fits naturally",
+].join("\n");
+
 const DEFAULT_VIRAL_STRATEGY = [
   "Use X-style ranking signals as inspiration for Threads replies: replies, likes, repost/share intent, profile clicks, dwell, and follow intent.",
   "Avoid negative signals: spammy repetition, copied wording, generic praise, rage bait, blocks, mutes, reports, and not-interested reactions.",
@@ -71,11 +80,11 @@ async function init() {
     el.modelSelect.value = openaiModel;
   }
 
-  if (userVoice) {
-    el.userVoiceInput.value = userVoice;
-    el.voiceStatus.textContent = "Saved — applied to every generated comment";
-    el.voiceStatus.classList.add("saved");
-  }
+  el.userVoiceInput.value = userVoice || DEFAULT_USER_VOICE;
+  el.voiceStatus.textContent = userVoice
+    ? "Saved — applied to every generated comment"
+    : "Default voice — edit and save to customize";
+  el.voiceStatus.classList.toggle("saved", !!userVoice);
 
   el.viralStrategyInput.value = viralStrategy || DEFAULT_VIRAL_STRATEGY;
   el.useViralStrategyToggle.checked = useViralStrategy !== false;
@@ -125,9 +134,12 @@ el.saveVoiceBtn.addEventListener("click", async () => {
   hideError();
 
   el.saveVoiceBtn.textContent = "Saved ✓";
+  if (!userVoice) {
+    el.userVoiceInput.value = DEFAULT_USER_VOICE;
+  }
   el.voiceStatus.textContent = userVoice
     ? "Saved — applied to every generated comment"
-    : "Cleared — comments use tone only";
+    : "Default voice — edit and save to customize";
   el.voiceStatus.classList.toggle("saved", !!userVoice);
   setTimeout(() => { el.saveVoiceBtn.textContent = "Save voice"; }, 1500);
 });
@@ -207,7 +219,7 @@ async function generateComment() {
     postText: currentPostText,
     apiKey: openaiKey,
     model: openaiModel || "gpt-4o-mini",
-    userVoice: userVoice || "",
+    userVoice: userVoice || DEFAULT_USER_VOICE,
     viralStrategy: useViralStrategy === false ? "" : (viralStrategy || DEFAULT_VIRAL_STRATEGY),
   });
 

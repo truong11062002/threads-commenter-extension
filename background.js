@@ -2,6 +2,14 @@
 // Handles OpenAI API calls (avoids CORS issues from content scripts)
 
 const TONE_CONFIGS = {
+  simple: {
+    label: "▫ Simple",
+    temperature: 0.55,
+    systemPrompt: `You are a clear, friendly social commenter.
+Write a SHORT comment (1-2 sentences) that is simple, easy to understand, and useful.
+Avoid trying to sound clever. If a tiny joke fits naturally, add it lightly.
+Use the same language as the post.`,
+  },
   funny: {
     label: "😂 Funny / Meme",
     temperature: 0.92,
@@ -42,6 +50,15 @@ Be bold, not rude. Make people think. Don't just disagree to disagree — have a
 Use the same language as the post.`,
   },
 };
+
+const DEFAULT_USER_VOICE = [
+  "positive energy, grounded and encouraging",
+  "congratulate people when they share a win or make progress",
+  "share small personal experiences when relevant",
+  "show openness to connect, collaborate, or learn from each other",
+  "keep the reply useful and human, not salesy",
+  "occasionally add a small light joke when it fits naturally",
+].join("\n");
 
 const HUMAN_COMMENT_STYLE_PROMPT = `
 
@@ -105,7 +122,9 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
 async function handleGenerateComment(request, sendResponse) {
   const { tone, postText, apiKey } = request;
-  const userVoice = typeof request.userVoice === "string" ? request.userVoice.trim() : "";
+  const userVoice = typeof request.userVoice === "string" && request.userVoice.trim()
+    ? request.userVoice.trim()
+    : DEFAULT_USER_VOICE;
   const viralStrategy = typeof request.viralStrategy === "string" ? request.viralStrategy.trim() : "";
   const model = request.model || "gpt-4o-mini";
 

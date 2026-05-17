@@ -4,12 +4,22 @@
 // ─── Config ───────────────────────────────────────────────────────────────────
 
 const TONES = [
+  { key: "simple",     emoji: "▫", label: "Simple",     desc: "Clear reply" },
   { key: "funny",      emoji: "😂", label: "Funny",      desc: "Meme energy" },
   { key: "insightful", emoji: "🧠", label: "Insightful", desc: "Smart take" },
   { key: "curious",   emoji: "❓", label: "Curious",    desc: "Ask deeper" },
   { key: "relatable", emoji: "😤", label: "Relatable",  desc: "Shared pain" },
   { key: "contrarian",emoji: "🔥", label: "Contrarian", desc: "Hot take" },
 ];
+
+const DEFAULT_USER_VOICE = [
+  "positive energy, grounded and encouraging",
+  "congratulate people when they share a win or make progress",
+  "share small personal experiences when relevant",
+  "show openness to connect, collaborate, or learn from each other",
+  "keep the reply useful and human, not salesy",
+  "occasionally add a small light joke when it fits naturally",
+].join("\n");
 
 const DEFAULT_VIRAL_STRATEGY = [
   "Use X-style ranking signals as inspiration for Threads replies: replies, likes, repost/share intent, profile clicks, dwell, and follow intent.",
@@ -358,7 +368,7 @@ async function generateAndFill(tone, replyBox, panel, anchorBtn) {
       postText,
       apiKey: openaiKey,
       model: openaiModel || "gpt-4o-mini",
-      userVoice: userVoice || "",
+      userVoice: userVoice || DEFAULT_USER_VOICE,
       viralStrategy: useViralStrategy === false ? "" : (viralStrategy || DEFAULT_VIRAL_STRATEGY),
     });
 
