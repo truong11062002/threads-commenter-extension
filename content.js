@@ -98,61 +98,51 @@ function getActivePostText() {
 
 // ─── Inject Text into Reply Box ───────────────────────────────────────────────
 
-function clearReplyBox() {
-  document.execCommand("selectAll", false, null);
-  document.execCommand("delete", false, null);
-}
+function moveReplyCursorToEnd(textbox) {
+  const selection = window.getSelection?.();
+  if (!selection) return;
 
-function dispatchReplyInput(textbox) {
-  try {
-    const event = typeof InputEvent === "function"
-      ? new InputEvent("input", { bubbles: true, inputType: "insertText", data: null })
-      : new Event("input", { bubbles: true });
-    textbox.dispatchEvent(event);
-  } catch {
-    textbox.dispatchEvent(new Event("input", { bubbles: true }));
-  }
-}
-
-function insertReplyTextWithLineBreaks(text) {
-  const normalized = String(text || "").replace(/\r\n?/g, "\n");
-  if (!normalized) return true;
-
-  const parts = normalized.split(/(\n)/);
-  for (const part of parts) {
-    if (!part) continue;
-
-    if (part === "\n") {
-      const ok = document.execCommand("insertLineBreak", false, null)
-        || document.execCommand("insertHTML", false, "<br>");
-      if (!ok) return false;
-      continue;
-    }
-
-    if (!document.execCommand("insertText", false, part)) return false;
-  }
-
-  return true;
+  const range = document.createRange();
+  range.selectNodeContents(textbox);
+  range.collapse(false);
+  selection.removeAllRanges();
+  selection.addRange(range);
 }
 
 function injectTextIntoReplyBox(textbox, text) {
   try {
     textbox.focus();
-    clearReplyBox();
+    textbox.click?.();
 
-    const ok = insertReplyTextWithLineBreaks(text);
-    if (ok) {
-      dispatchReplyInput(textbox);
-      return true;
-    }
+    textbox.innerHTML = "";
 
-    clearReplyBox();
-    const dt = new DataTransfer();
-    dt.setData("text/plain", text);
-    textbox.dispatchEvent(new ClipboardEvent("paste", { clipboardData: dt, bubbles: true }));
-    dispatchReplyInput(textbox);
+    const lines = String(text || "").replace(/\r\n?/g, "\n").split("\n");
+    lines.forEach((line, index) => {
+      textbox.appendChild(document.createTextNode(line));
+      if (index < lines.length - 1) {
+        textbox.appendChild(document.createElement("br"));
+      }
+    });
+
+    textbox.dispatchEvent(new Event("input", { bubbles: true }));
+    textbox.dispatchEvent(new Event("change", { bubbles: true }));
+    moveReplyCursorToEnd(textbox);
+
     return true;
-  } catch { return false; }
+  } catch (err) {
+    console.error("[Threads AI] Could not inject reply text", err);
+    return false;
+  }
+}
+
+function typeInReplyBox(content) {
+  const replyBox = document.querySelector('div[contenteditable="true"]');
+  if (!replyBox) {
+    console.error("[Threads AI] Không tìm thấy ô reply!");
+    return false;
+  }
+
+  return injectTextIntoReplyBox(replyBox, content);
 }
 
 // ─── Inline UI Injection ──────────────────────────────────────────────────────
@@ -504,5 +494,5 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   return true;
 });
 
-window.__threadsAI = { scrapeThreadsPostPage, getActivePostText };
+window.__threadsAI = { scrapeThreadsPostPage, getActivePostText, typeInReplyBox };
 console.log("[Threads AI] Content script ready ✦");
