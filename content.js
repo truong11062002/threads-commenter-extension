@@ -124,8 +124,14 @@ function injectTextIntoReplyBox(textbox, text) {
       }
     });
 
-    textbox.dispatchEvent(new Event("input", { bubbles: true }));
+    textbox.dispatchEvent(new InputEvent("input", {
+      bubbles: true,
+      cancelable: true,
+      inputType: "insertText",
+      data: text,
+    }));
     textbox.dispatchEvent(new Event("change", { bubbles: true }));
+
     moveReplyCursorToEnd(textbox);
 
     return true;
@@ -412,11 +418,20 @@ async function generateAndFill(tone, replyBox, panel, anchorBtn) {
     return;
   }
 
-  // Fill reply box
+  // Fill reply box — re-query in case Threads re-rendered the DOM during the API call
   closePanel();
   anchorBtn.classList.remove("loading");
-  injectTextIntoReplyBox(replyBox, comment);
-  replyBox.focus();
+  const freshReplyBox = replyBox.isConnected
+    ? replyBox
+    : document.querySelector('[role="textbox"][contenteditable="true"]');
+  if (freshReplyBox) {
+    freshReplyBox.focus();
+    await new Promise(r => setTimeout(r, 50));
+    injectTextIntoReplyBox(freshReplyBox, comment);
+  } else {
+    injectTextIntoReplyBox(replyBox, comment);
+    replyBox.focus();
+  }
 }
 
 function showPanelError(panel, msg) {
