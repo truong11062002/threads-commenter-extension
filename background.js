@@ -73,9 +73,10 @@ Human mobile reply style:
 - Protect the user's personal brand: sound trustworthy, clear, consistent, and worth following.
 - Write 1 to 3 short sentences.
 - Use one simple sentence or thought per line.
-- Put exactly one blank line between every sentence or thought so the reply is easy to scan.
+- After every sentence ending with ".", "!", or "?", start a new line using "\n".
+- Do not join sentences on the same line.
 - Do not use bullet points, numbered lists, markdown, hashtags, or headings.
-- Do not use emoji.
+- You may use at most one small icon or emoji if it feels natural and makes the reply warmer.
 - Do not use hyphens, bullet-like formatting, or list structures.
 - Write from a real observation or personal experience.
 - Do not fully wrap up the thought. Leave it slightly open, unfinished, or add another angle.
@@ -257,6 +258,7 @@ function formatHumanComment(rawComment) {
     .replace(/\r\n/g, "\n")
     .replace(/^[ \t]*[-*•][ \t]+/gm, "")
     .replace(/([.!?])\s+-\s+/g, "$1\n")
+    .replace(/([.!?])(?=\S)/g, "$1\n")
     .replace(/[ \t]*[—–][ \t]*/g, ", ")
     .replace(/[ \t]+-[ \t]+/g, ", ")
     .replace(/\b(that'?s a great point|this is a great point|i completely agree|this is such an important reminder|in today'?s world|exactly|honestly|definitely|absolutely|dive into)\b[,.!?]?\s*/gi, "")
@@ -271,12 +273,12 @@ function formatHumanComment(rawComment) {
 
   if (chunks.length === 0) return null;
 
-  return chunks.slice(0, 3).join("\n\n");
+  return chunks.slice(0, 3).join("\n");
 }
 
 function splitIntoSentenceLikeChunks(text) {
   const pieces = text
-    .split(/(?<=[.!?])\s+/)
+    .split(/(?<=[.!?])\s*/)
     .map(piece => piece.trim())
     .filter(Boolean);
 
