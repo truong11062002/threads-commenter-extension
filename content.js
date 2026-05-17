@@ -98,21 +98,59 @@ function getActivePostText() {
 
 // ─── Inject Text into Reply Box ───────────────────────────────────────────────
 
+function clearReplyBox() {
+  document.execCommand("selectAll", false, null);
+  document.execCommand("delete", false, null);
+}
+
+function dispatchReplyInput(textbox) {
+  try {
+    const event = typeof InputEvent === "function"
+      ? new InputEvent("input", { bubbles: true, inputType: "insertText", data: null })
+      : new Event("input", { bubbles: true });
+    textbox.dispatchEvent(event);
+  } catch {
+    textbox.dispatchEvent(new Event("input", { bubbles: true }));
+  }
+}
+
+function insertReplyTextWithLineBreaks(text) {
+  const normalized = String(text || "").replace(/\r\n?/g, "\n");
+  if (!normalized) return true;
+
+  const parts = normalized.split(/(\n)/);
+  for (const part of parts) {
+    if (!part) continue;
+
+    if (part === "\n") {
+      const ok = document.execCommand("insertLineBreak", false, null)
+        || document.execCommand("insertHTML", false, "<br>");
+      if (!ok) return false;
+      continue;
+    }
+
+    if (!document.execCommand("insertText", false, part)) return false;
+  }
+
+  return true;
+}
+
 function injectTextIntoReplyBox(textbox, text) {
   try {
     textbox.focus();
-    // Clear existing content first
-    document.execCommand("selectAll", false, null);
-    document.execCommand("delete", false, null);
+    clearReplyBox();
 
-    // Method 1: execCommand insertText
-    const ok = document.execCommand("insertText", false, text);
-    if (ok) return true;
+    const ok = insertReplyTextWithLineBreaks(text);
+    if (ok) {
+      dispatchReplyInput(textbox);
+      return true;
+    }
 
-    // Method 2: paste event (only if method 1 failed)
+    clearReplyBox();
     const dt = new DataTransfer();
     dt.setData("text/plain", text);
     textbox.dispatchEvent(new ClipboardEvent("paste", { clipboardData: dt, bubbles: true }));
+    dispatchReplyInput(textbox);
     return true;
   } catch { return false; }
 }
