@@ -73,7 +73,7 @@ Human mobile reply style:
 - Protect the user's personal brand: sound trustworthy, clear, consistent, and worth following.
 - Write 1 to 3 short sentences.
 - Use one simple sentence or thought per line.
-- After every sentence ending with ".", "!", or "?", start a new line using "\n".
+- After every sentence ending with ".", "!", or "?", start a new paragraph using "\n\n" so there is one blank line between sentences.
 - Do not join sentences on the same line.
 - Do not use bullet points, numbered lists, markdown, hashtags, or headings.
 - You may use at most one small icon or emoji if it feels natural and makes the reply warmer.
@@ -273,7 +273,7 @@ function formatHumanComment(rawComment) {
 
   if (chunks.length === 0) return null;
 
-  return chunks.slice(0, 3).join("\n");
+  return chunks.slice(0, 3).join("\n\n");
 }
 
 function splitIntoSentenceLikeChunks(text) {
