@@ -17,6 +17,9 @@ const DEFAULT_VIRAL_STRATEGY = [
   "0 to 300 followers: earn trust and profile clicks with relatable observations, tiny personal experiences, and clear niche identity.",
   "300 to 1000 followers: build recognizable angles with sharper observations, useful disagreement, or concrete follow-ups.",
   "1000 to 5000 followers: become a concise signal source with pattern recognition, simple frameworks, or lived lessons.",
+  "Make every reply useful to the reader with a small insight, validation, practical angle, or lived observation.",
+  "Keep the energy positive, grounded, and constructive without sounding fake or motivational.",
+  "Build personal branding by quietly showing values, taste, niche, and a consistent way of seeing the world.",
   "Every reply must be short, lowercase, specific to the post, human, and easy to scan.",
 ].join("\n");
 

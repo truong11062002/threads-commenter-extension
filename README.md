@@ -15,6 +15,7 @@ Building in public works best when you show up consistently. The hard part is no
 - **Reply in your own voice**: save your writing style so comments sound more like you.
 - **Optimize for real conversations**: use a Threads comment strategy that invites meaningful replies without spam or engagement bait.
 - **Grow by milestone**: apply X-style engagement signals for `0 -> 300`, `300 -> 1000`, and `1000 -> 5000` follower stages.
+- **Build personal brand**: replies aim to be useful, positive, grounded, and consistent with your values and niche.
 - **Sound human on mobile**: comments stay lowercase, short, blunt, clear, and easy to scan, with a blank line between each sentence or thought.
 - **Pick the right tone**: choose Funny, Insightful, Curious, Relatable, or Contrarian.
 - **Use GPT-5.5**: select `gpt-5.5` for higher-quality replies through the OpenAI Responses API.
@@ -51,6 +52,8 @@ The extension uses your own OpenAI API key. Your key and personalization setting
 ## Growth Strategy
 
 The default strategy is inspired by X-style ranking signals from `xai-org/x-algorithm`: replies, likes, repost/share intent, profile clicks, dwell, and follow intent. It also avoids negative signals such as spammy repetition, copied wording, generic praise, rage bait, blocks, mutes, reports, and not-interested reactions.
+
+Every generated reply is also guided to support personal branding: useful to the reader, positive without sounding fake, grounded in a real observation, and consistent enough that people can recognize the account's point of view over time.
 
 | Milestone | Comment Strategy |
 |-----------|------------------|
