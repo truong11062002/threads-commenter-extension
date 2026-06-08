@@ -1,0 +1,12 @@
+{
+  "name": "threads-ai-commenter-extension",
+  "version": "1.3.0",
+  "private": true,
+  "description": "Validation and packaging scripts for the Threads AI Commenter Chrome extension.",
+  "scripts": {
+    "syntax": "node --check background.js && node --check content.js && node --check popup/popup.js && node --check scripts/build-store-package.js && node --check tests/background-api.test.js && node --check tests/content-extraction.test.js && node --check tests/content-formatter.test.js && node --check tests/content-injection.test.js && node --check tests/copy-extension-script.test.js && node --check tests/package-validation.test.js && node --check tests/popup-auth-status.test.js",
+    "test": "node tests/background-api.test.js && node tests/content-extraction.test.js && node tests/content-formatter.test.js && node tests/content-injection.test.js && node tests/copy-extension-script.test.js && node tests/package-validation.test.js && node tests/popup-auth-status.test.js",
+    "package": "node scripts/build-store-package.js",
+    "check": "npm run syntax && npm test && npm run package"
+  }
+}

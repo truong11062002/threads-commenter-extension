@@ -1,16 +1,13 @@
 {
   "manifest_version": 3,
   "name": "Threads AI Commenter",
-  "version": "1.0.0",
-  "description": "Generate contextual AI comments on Threads with 5 different tones. Uses your own OpenAI API key.",
-  "permissions": [
-    "activeTab",
-    "storage"
-  ],
+  "version": "1.3.0",
+  "description": "Generate on-brand Threads replies in your voice with AI tones and saved comment strategies.",
+  "permissions": ["activeTab", "storage"],
   "host_permissions": [
     "https://www.threads.net/*",
     "https://www.threads.com/*",
-    "https://api.openai.com/*"
+    "https://threads-commenter-extension.fastapicloud.dev/*"
   ],
   "background": {
     "service_worker": "background.js"
@@ -30,10 +27,7 @@
   },
   "content_scripts": [
     {
-      "matches": [
-        "https://www.threads.net/*",
-        "https://www.threads.com/*"
-      ],
+      "matches": ["https://www.threads.net/*", "https://www.threads.com/*"],
       "js": ["content.js"],
       "run_at": "document_idle"
     }

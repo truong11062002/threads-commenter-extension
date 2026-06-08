@@ -1,10 +1,5 @@
 // popup.js
 
-let selectedTone = null;
-let isLoading = false;
-let currentPostText = null;
-let activeTabId = null;
-
 const DEFAULT_USER_VOICE = [
   "positive energy, grounded and encouraging",
   "congratulate people when they share a win or make progress",
@@ -14,275 +9,224 @@ const DEFAULT_USER_VOICE = [
   "occasionally add a small light joke when it fits naturally",
 ].join("\n");
 
-const DEFAULT_VIRAL_STRATEGY = [
-  "Use X-style ranking signals as inspiration for Threads replies: replies, likes, repost/share intent, profile clicks, dwell, and follow intent.",
-  "Avoid negative signals: spammy repetition, copied wording, generic praise, rage bait, blocks, mutes, reports, and not-interested reactions.",
-  "0 to 300 followers: earn trust and profile clicks with relatable observations, tiny personal experiences, and clear niche identity.",
-  "300 to 1000 followers: build recognizable angles with sharper observations, useful disagreement, or concrete follow-ups.",
-  "1000 to 5000 followers: become a concise signal source with pattern recognition, simple frameworks, or lived lessons.",
-  "Make every reply useful to the reader with a small insight, validation, practical angle, or lived observation.",
-  "Keep the energy positive, grounded, and constructive without sounding fake or motivational.",
-  "Build personal branding by quietly showing values, taste, niche, and a consistent way of seeing the world.",
-  "Every reply must be short, lowercase, specific to the post, human, and easy to scan.",
-].join("\n");
-
-const el = {
-  apiKeyInput:       document.getElementById("apiKeyInput"),
-  saveKeyBtn:        document.getElementById("saveKeyBtn"),
-  keyStatus:         document.getElementById("keyStatus"),
-  modelSelect:       document.getElementById("modelSelect"),
-  userVoiceInput:    document.getElementById("userVoiceInput"),
-  saveVoiceBtn:      document.getElementById("saveVoiceBtn"),
-  voiceStatus:       document.getElementById("voiceStatus"),
-  viralStrategyInput: document.getElementById("viralStrategyInput"),
-  useViralStrategyToggle: document.getElementById("useViralStrategyToggle"),
-  resetStrategyBtn:  document.getElementById("resetStrategyBtn"),
-  strategyStatus:    document.getElementById("strategyStatus"),
-  tonesGrid:         document.getElementById("tonesGrid"),
-  generateBtn:       document.getElementById("generateBtn"),
-  generateBtnText:   document.getElementById("generateBtnText"),
-  generateBtnLoader: document.getElementById("generateBtnLoader"),
-  resultArea:        document.getElementById("resultArea"),
-  resultText:        document.getElementById("resultText"),
-  copyBtn:           document.getElementById("copyBtn"),
-  injectBtn:         document.getElementById("injectBtn"),
-  regenBtn:          document.getElementById("regenBtn"),
-  errorArea:         document.getElementById("errorArea"),
-  errorText:         document.getElementById("errorText"),
+const STRATEGY_TEMPLATES = {
+  sparkReply: [
+    "Template: Spark Reply",
+    "Open question hook",
+    "Goal: pull more real replies from the author and nearby readers.",
+    "Write a short comment that notices one specific detail, validates the point briefly, then asks one concrete follow-up question.",
+    "Avoid generic praise, fake curiosity, and engagement-bait wording.",
+  ].join("\n"),
+  valueDrop: [
+    "Template: Value Drop",
+    "Add value + soft CTA",
+    "Goal: build authority while staying generous and low-pressure.",
+    "Write a concise comment with one useful insight, example, or next step, then add a soft invitation to compare notes or try the idea.",
+    "Avoid sounding like a sales pitch, lecture, or recycled advice.",
+  ].join("\n"),
+  hotTake: [
+    "Template: Hot Take",
+    "Contrarian + credibility",
+    "Goal: stand out with a sharp but fair angle.",
+    "Write a concise comment that respectfully challenges the obvious take, explains why in one grounded line, and shows lived experience or pattern recognition.",
+    "Avoid rage bait, dunking, and disagreement that feels personal.",
+  ].join("\n"),
 };
 
-// ─── Init ─────────────────────────────────────────────────────
-async function init() {
-  chrome.storage.local.remove(["replyIconPrompt", "replyIconDataUrl"]).catch(() => {});
+const DEFAULT_VIRAL_STRATEGY = STRATEGY_TEMPLATES.sparkReply;
 
+const el = {
+  userVoiceInput: document.getElementById("userVoiceInput"),
+  saveVoiceBtn: document.getElementById("saveVoiceBtn"),
+  voiceStatus: document.getElementById("voiceStatus"),
+  viralStrategyInput: document.getElementById("viralStrategyInput"),
+  sparkReplyTemplateBtn: document.getElementById("sparkReplyTemplateBtn"),
+  valueDropTemplateBtn: document.getElementById("valueDropTemplateBtn"),
+  hotTakeTemplateBtn: document.getElementById("hotTakeTemplateBtn"),
+  strategyStatus: document.getElementById("strategyStatus"),
+  errorArea: document.getElementById("errorArea"),
+  errorText: document.getElementById("errorText"),
+};
+
+let initPromise = null;
+
+async function init() {
+  if (initPromise) return initPromise;
+  initPromise = initializePreferences();
+  return initPromise;
+}
+
+async function initializePreferences() {
   const {
-    openaiKey,
-    openaiModel,
     userVoice,
     viralStrategy,
     useViralStrategy,
   } = await chrome.storage.local.get([
-    "openaiKey",
-    "openaiModel",
     "userVoice",
     "viralStrategy",
     "useViralStrategy",
   ]);
 
-  if (openaiKey) {
-    el.apiKeyInput.value = openaiKey;
-    const masked = "sk-..." + openaiKey.slice(-4);
-    el.keyStatus.textContent = `Saved · ${masked}`;
-    el.keyStatus.classList.add("saved");
-  }
+  applyPreferences({
+    userVoice,
+    viralStrategy,
+    useViralStrategy,
+  });
 
-  if (openaiModel) {
-    el.modelSelect.value = openaiModel;
-  }
+  await loadBackendPreferences();
+}
+
+function applyPreferences(preferences = {}) {
+  const userVoice = cleanString(preferences.userVoice);
+  const viralStrategy = cleanString(preferences.viralStrategy);
 
   el.userVoiceInput.value = userVoice || DEFAULT_USER_VOICE;
   el.voiceStatus.textContent = userVoice
-    ? "Saved — applied to every generated comment"
-    : "Default voice — edit and save to customize";
+    ? "Saved, applied to every generated comment"
+    : "Default voice, edit and save to customize";
   el.voiceStatus.classList.toggle("saved", !!userVoice);
 
   el.viralStrategyInput.value = viralStrategy || DEFAULT_VIRAL_STRATEGY;
-  el.useViralStrategyToggle.checked = useViralStrategy !== false;
-  el.strategyStatus.textContent = el.useViralStrategyToggle.checked
-    ? "Active — AI will optimize with X-style growth signals"
-    : "Paused — AI will use tone and voice only";
-  el.strategyStatus.classList.toggle("saved", el.useViralStrategyToggle.checked);
-
-  // Get active tab
-  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  activeTabId = tab?.id;
-
-  // Try to prefetch post text silently
-  const isThreads = tab?.url?.includes("threads.com") || tab?.url?.includes("threads.net");
-  if (isThreads && activeTabId) {
-    try {
-      const res = await chrome.tabs.sendMessage(activeTabId, { type: "GET_POST_TEXT" });
-      if (res?.text) currentPostText = res.text;
-    } catch { /* silent — content script may not be ready */ }
-  }
+  el.strategyStatus.textContent = viralStrategy
+    ? "Saved, used in every generated Threads reply"
+    : "Pick a template or write your own strategy";
+  el.strategyStatus.classList.toggle("saved", !!viralStrategy);
 }
 
-// ─── API Key ──────────────────────────────────────────────────
-el.saveKeyBtn.addEventListener("click", async () => {
-  const key = el.apiKeyInput.value.trim();
-  if (!key) { showError("Please enter your OpenAI API key."); return; }
-  if (!key.startsWith("sk-")) { showError("API key should start with sk-"); return; }
-
-  await chrome.storage.local.set({ openaiKey: key });
-  hideError();
-
-  el.saveKeyBtn.textContent = "Saved ✓";
-  el.keyStatus.textContent = "sk-..." + key.slice(-4);
-  el.keyStatus.classList.add("saved");
-  setTimeout(() => { el.saveKeyBtn.textContent = "Save"; }, 1500);
-});
-
-// ─── Model Select ─────────────────────────────────────────────
-el.modelSelect.addEventListener("change", async () => {
-  await chrome.storage.local.set({ openaiModel: el.modelSelect.value });
-});
-
-// ─── User Voice ───────────────────────────────────────────────
 el.saveVoiceBtn.addEventListener("click", async () => {
-  const userVoice = el.userVoiceInput.value.trim();
-  await chrome.storage.local.set({ userVoice });
-  hideError();
+  el.saveVoiceBtn.disabled = true;
+  const originalText = el.saveVoiceBtn.textContent;
+  try {
+    const preferences = await savePreferencesToBackend();
+    hideError();
 
-  el.saveVoiceBtn.textContent = "Saved ✓";
-  if (!userVoice) {
-    el.userVoiceInput.value = DEFAULT_USER_VOICE;
+    el.saveVoiceBtn.textContent = "Saved";
+    el.voiceStatus.textContent = preferences.userVoice
+      ? "Saved to backend, applied to every generated comment"
+      : "Default voice, saved to backend";
+    el.voiceStatus.classList.toggle("saved", !!preferences.userVoice);
+    setTimeout(() => { el.saveVoiceBtn.textContent = "Save voice"; }, 1500);
+  } catch (error) {
+    el.saveVoiceBtn.textContent = originalText;
+    showError(error?.message || "Could not save voice to backend.");
+  } finally {
+    el.saveVoiceBtn.disabled = false;
   }
-  el.voiceStatus.textContent = userVoice
-    ? "Saved — applied to every generated comment"
-    : "Default voice — edit and save to customize";
-  el.voiceStatus.classList.toggle("saved", !!userVoice);
-  setTimeout(() => { el.saveVoiceBtn.textContent = "Save voice"; }, 1500);
 });
 
 el.viralStrategyInput.addEventListener("change", saveViralStrategy);
-el.useViralStrategyToggle.addEventListener("change", saveViralStrategy);
-el.resetStrategyBtn.addEventListener("click", async () => {
-  el.viralStrategyInput.value = DEFAULT_VIRAL_STRATEGY;
-  el.useViralStrategyToggle.checked = true;
+el.sparkReplyTemplateBtn.addEventListener("click", () => applyStrategyTemplate("sparkReply"));
+el.valueDropTemplateBtn.addEventListener("click", () => applyStrategyTemplate("valueDrop"));
+el.hotTakeTemplateBtn.addEventListener("click", () => applyStrategyTemplate("hotTake"));
+
+async function applyStrategyTemplate(templateKey) {
+  el.viralStrategyInput.value = STRATEGY_TEMPLATES[templateKey] || DEFAULT_VIRAL_STRATEGY;
   await saveViralStrategy();
-});
+}
 
 async function saveViralStrategy() {
-  const viralStrategy = el.viralStrategyInput.value.trim() || DEFAULT_VIRAL_STRATEGY;
-  const useViralStrategy = el.useViralStrategyToggle.checked;
-  await chrome.storage.local.set({ viralStrategy, useViralStrategy });
-  el.strategyStatus.textContent = useViralStrategy
-    ? "Active — AI will optimize with X-style growth signals"
-    : "Paused — AI will use tone and voice only";
-  el.strategyStatus.classList.toggle("saved", useViralStrategy);
-  hideError();
+  setTemplateButtonsDisabled(true);
+  try {
+    const preferences = await savePreferencesToBackend();
+    el.strategyStatus.textContent = preferences.viralStrategy
+      ? "Saved to backend, used in every generated reply"
+      : "Default strategy, saved to backend";
+    el.strategyStatus.classList.toggle("saved", !!preferences.viralStrategy);
+    hideError();
+  } catch (error) {
+    showError(error?.message || "Could not save strategy to backend.");
+  } finally {
+    setTemplateButtonsDisabled(false);
+  }
 }
 
-// ─── Tone Selection ───────────────────────────────────────────
-el.tonesGrid.addEventListener("click", (e) => {
-  const btn = e.target.closest(".tone-btn");
-  if (!btn) return;
-  document.querySelectorAll(".tone-btn").forEach(b => b.classList.remove("selected"));
-  btn.classList.add("selected");
-  selectedTone = btn.dataset.tone;
-  el.generateBtn.disabled = false;
-  el.generateBtnText.textContent = "Generate comment";
-  hideError();
-});
+async function loadBackendPreferences() {
+  try {
+    const response = await chrome.runtime.sendMessage({ type: "GET_PREFERENCES" });
+    if (!response?.preferences) return;
 
-// ─── Generate ─────────────────────────────────────────────────
-el.generateBtn.addEventListener("click", generateComment);
-el.regenBtn.addEventListener("click", generateComment);
+    const preferences = normalizePreferences(response.preferences);
+    if (!hasSavedBackendPreferences(preferences)) return;
 
-async function generateComment() {
-  if (isLoading || !selectedTone) return;
-
-  const {
-    openaiKey,
-    openaiModel,
-    userVoice,
-    viralStrategy,
-    useViralStrategy,
-  } = await chrome.storage.local.get([
-    "openaiKey",
-    "openaiModel",
-    "userVoice",
-    "viralStrategy",
-    "useViralStrategy",
-  ]);
-  if (!openaiKey) { showError("Add your OpenAI API key above first."); return; }
-
-  if (!currentPostText && activeTabId) {
-    try {
-      const res = await chrome.tabs.sendMessage(activeTabId, { type: "GET_POST_TEXT" });
-      if (res?.text) currentPostText = res.text;
-    } catch {}
+    applyPreferences(preferences);
+    await chrome.storage.local.set({
+      userVoice: preferences.userVoice,
+      viralStrategy: preferences.viralStrategy,
+      useViralStrategy: preferences.useViralStrategy,
+    });
+    hideError();
+  } catch {
+    // Keep local settings usable if the backend is temporarily unavailable.
   }
+}
 
-  if (!currentPostText) {
-    showError("No post text found. Open a Threads post page first.");
-    return;
-  }
-
-  setLoading(true);
-  hideError();
-  el.resultArea.style.display = "none";
-
+async function savePreferencesToBackend() {
+  const current = readCurrentPreferences();
   const response = await chrome.runtime.sendMessage({
-    type: "GENERATE_COMMENT",
-    tone: selectedTone,
-    postText: currentPostText,
-    apiKey: openaiKey,
-    model: openaiModel || "gpt-4o-mini",
-    userVoice: userVoice || DEFAULT_USER_VOICE,
-    viralStrategy: useViralStrategy === false ? "" : (viralStrategy || DEFAULT_VIRAL_STRATEGY),
+    type: "SAVE_PREFERENCES",
+    ...current,
   });
 
-  setLoading(false);
-
-  if (!response) showError("No response from the extension background worker.");
-  else if (response.error) showError(response.error);
-  else if (response.comment) showResult(response.comment);
-}
-
-// ─── Result ───────────────────────────────────────────────────
-function showResult(comment) {
-  el.resultText.textContent = comment;
-  el.resultArea.style.display = "block";
-  hideError();
-}
-
-el.copyBtn.addEventListener("click", async () => {
-  const text = el.resultText.textContent;
-  if (!text) return;
-  await navigator.clipboard.writeText(text);
-  const orig = el.copyBtn.innerHTML;
-  el.copyBtn.innerHTML = "✓ Copied";
-  setTimeout(() => { el.copyBtn.innerHTML = orig; }, 1500);
-});
-
-el.injectBtn.addEventListener("click", async () => {
-  const comment = el.resultText.textContent;
-  if (!comment || !activeTabId) return;
-  try {
-    const res = await chrome.tabs.sendMessage(activeTabId, { type: "INJECT_COMMENT", comment });
-    if (res?.success) {
-      el.injectBtn.innerHTML = "✓ Done!";
-      el.injectBtn.style.background = "var(--accent)";
-      el.injectBtn.style.color = "#0e0e0f";
-      setTimeout(() => {
-        el.injectBtn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12l7 7 7-7"/></svg> Use it`;
-        el.injectBtn.style.background = "";
-        el.injectBtn.style.color = "";
-      }, 1800);
-    } else {
-      showError(res?.error || "Click 'Reply' on a post first.");
-    }
-  } catch {
-    showError("Click 'Reply' on a Threads post to open the reply box.");
+  if (!response || response.error) {
+    throw new Error(response?.error || "Could not save preferences to backend.");
   }
-});
 
-// ─── Loading ──────────────────────────────────────────────────
-function setLoading(state) {
-  isLoading = state;
-  el.generateBtn.disabled = state;
-  el.generateBtnText.style.display = state ? "none" : "";
-  el.generateBtnLoader.style.display = state ? "flex" : "none";
+  const preferences = normalizePreferences(response.preferences || current);
+  applyPreferences(preferences);
+  await chrome.storage.local.set({
+    userVoice: preferences.userVoice,
+    viralStrategy: preferences.viralStrategy,
+    useViralStrategy: preferences.useViralStrategy,
+  });
+  return preferences;
 }
 
-// ─── Error ────────────────────────────────────────────────────
+function readCurrentPreferences() {
+  return {
+    userVoice: el.userVoiceInput.value.trim(),
+    viralStrategy: el.viralStrategyInput.value.trim() || DEFAULT_VIRAL_STRATEGY,
+    useViralStrategy: true,
+  };
+}
+
+function normalizePreferences(preferences = {}) {
+  return {
+    userVoice: cleanString(preferences.userVoice),
+    viralStrategy: cleanString(preferences.viralStrategy),
+    useViralStrategy: true,
+  };
+}
+
+function hasSavedBackendPreferences(preferences) {
+  return !!preferences.userVoice || !!preferences.viralStrategy;
+}
+
+function setTemplateButtonsDisabled(disabled) {
+  [
+    el.sparkReplyTemplateBtn,
+    el.valueDropTemplateBtn,
+    el.hotTakeTemplateBtn,
+  ].forEach(button => {
+    if (button) button.disabled = disabled;
+  });
+}
+
+function cleanString(value) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
 function showError(msg) {
+  if (!el.errorText || !el.errorArea) return;
   el.errorText.textContent = msg;
   el.errorArea.style.display = "flex";
 }
+
 function hideError() {
-  el.errorArea.style.display = "none";
+  if (el.errorArea) {
+    el.errorArea.style.display = "none";
+  }
 }
 
-init();
+init().catch(error => {
+  showError(error?.message || "Could not load extension settings.");
+});

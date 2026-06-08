@@ -17,19 +17,22 @@ Building in public works best when you show up consistently. The hard part is no
 - **Grow by milestone**: apply X-style engagement signals for `0 -> 300`, `300 -> 1000`, and `1000 -> 5000` follower stages.
 - **Build personal brand**: replies aim to be useful, positive, grounded, and consistent with your values and niche.
 - **Sound human on mobile**: comments stay lowercase, short, blunt, clear, and easy to scan, with a blank line between each sentence or thought.
-- **Pick the right tone**: choose Simple, Funny, Insightful, Curious, Relatable, or Contrarian.
-- **Use GPT-5.5**: select `gpt-5.5` for higher-quality replies through the OpenAI Responses API.
+- **Pick the right tone**: choose from 12 quick tones, including Simple, Friendly, Funny, Insightful, Curious, Relatable, Contrarian, Supportive, Expert, Visionary, Analytical, and Meme.
+- **Format comments cleanly**: use `Shift+Enter` for a new line while composing inside Threads.
 - **Stay in flow**: generate and insert replies directly from the Threads reply box.
 
 ## How It Works
 
-1. Open a Threads post.
-2. Click **Reply**.
-3. Click the inline **AI** button or open the extension popup.
+1. Open the extension popup.
+2. Open a Threads post and click **Reply**.
+3. Click the inline **AI** button in the reply box.
 4. Choose a tone.
 5. Review, insert, or copy the generated reply.
+6. Use `Shift+Enter` inside the Threads composer to split each sentence onto its own line.
 
-The extension uses your own OpenAI API key. Your key and personalization settings are stored locally in `chrome.storage.local`.
+The extension stores a generated device ID locally, then saves voice and strategy preferences through `https://threads-commenter-extension.fastapicloud.dev/api/preferences`. Comment generation goes through `https://threads-commenter-extension.fastapicloud.dev/api/comments/generate` with the focal post plus the visible thread context, and uses the saved backend preferences for that device.
+
+Chrome Web Store product copy is available in [`docs/chrome-web-store-listing.md`](docs/chrome-web-store-listing.md).
 
 ## Who It Is For
 
@@ -43,12 +46,18 @@ The extension uses your own OpenAI API key. Your key and personalization setting
 
 | Tone | Best For |
 |------|----------|
-| Simple | Clear, useful replies that are easy to understand |
-| Funny / Meme | Light replies, internet humor, punchy one-liners |
-| Insightful | Smart observations and added context |
-| Curious | Follow-up questions that invite real conversation |
-| Relatable | Warm, human, shared-experience comments |
-| Contrarian | Respectful counterpoints and fresh angles |
+| 💬 Simple | Clear, useful replies that are easy to understand |
+| 😊 Friendly | Warm, easygoing replies that feel natural |
+| 😂 Funny | Light humor and punchy one-liners |
+| 🧠 Insightful | Smart observations and added context |
+| ❓ Curious | Follow-up questions that invite real conversation |
+| 😮‍💨 Relatable | Warm, human, shared-experience comments |
+| 🔥 Contrarian | Respectful counterpoints and fresh angles |
+| 💪 Supportive | Grounded encouragement and validation |
+| 🎯 Expert | Practical, credible, high-signal replies |
+| 🚀 Visionary | Big-picture angles and future-facing takes |
+| 📊 Analytical | Pattern-based, evidence-aware replies |
+| 🐸 Meme | Playful internet energy |
 
 ## Growth Strategy
 
@@ -70,29 +79,49 @@ Every generated reply is also guided to support personal branding: useful to the
 4. Click **Load unpacked**.
 5. Select this project folder.
 
+## Chrome Web Store Submission
+
+Build the upload package from the project root:
+
+```bash
+node scripts/build-store-package.js
+```
+
+Upload the generated file in `dist/`, for example:
+
+```text
+dist/threads-ai-commenter-v1.3.0.zip
+```
+
+Do not upload a `.crx` file, and do not zip the parent folder manually. The generated ZIP keeps `manifest.json` at the archive root and includes only the extension runtime files.
+
+To verify an existing package before upload:
+
+```bash
+node scripts/build-store-package.js --verify dist/threads-ai-commenter-v1.3.0.zip
+```
+
 ## Setup
 
 1. Click the extension icon in the Chrome toolbar.
-2. Paste your OpenAI API key.
-3. Choose your preferred model.
-4. Add your personal voice in **Your voice**.
-5. Adjust **Threads comment strategy** if you want a different reply style.
+2. Add your personal voice in **Your voice**.
+3. Adjust **Threads comment strategy** if you want a different reply style.
+4. Open a Threads post and click **Reply**.
+5. Pick a tone and generate a comment.
 
 The default voice uses positive energy, celebrates other people's wins, shares relevant personal experience, stays open to connection or collaboration, and occasionally adds a light joke when it fits.
 
-## Models
+## API
 
-- Default: `gpt-4o-mini`
-- Higher quality: `gpt-5.5`
-- Other supported options: `gpt-4o`, `gpt-4.1`, `gpt-4.1-mini`, `gpt-4.1-nano`
-
-GPT-5.x models use the OpenAI Responses API. Older GPT-4 models continue using Chat Completions.
+- Base URL: `https://threads-commenter-extension.fastapicloud.dev`
+- Preferences: `GET /api/preferences`, `PUT /api/preferences`
+- Generation: `POST /api/comments/generate`
 
 ## Privacy
 
-- Your OpenAI API key is stored locally.
-- Your voice and strategy settings are stored locally.
-- Post text is sent to OpenAI only when you generate a reply.
+- Your generated device ID is stored locally.
+- Your voice and strategy settings are saved by the Threads AI Commenter API for that device, with a local cache in the extension.
+- The focal post text and visible thread context are sent to the Threads AI Commenter API only when you generate a reply.
 - No external analytics or tracking are included.
 
 ## Troubleshooting

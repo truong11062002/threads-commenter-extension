@@ -4,34 +4,25 @@
 // ─── Config ───────────────────────────────────────────────────────────────────
 
 const TONES = [
-  { key: "simple",     emoji: "▫", label: "Simple",     desc: "Clear reply" },
-  { key: "funny",      emoji: "😂", label: "Funny",      desc: "Meme energy" },
+  { key: "simple", emoji: "💬", label: "Simple", desc: "Clear reply" },
+  { key: "friendly", emoji: "😊", label: "Friendly", desc: "Warm reply" },
+  { key: "funny", emoji: "😂", label: "Funny", desc: "Quick laugh" },
   { key: "insightful", emoji: "🧠", label: "Insightful", desc: "Smart take" },
-  { key: "curious",   emoji: "❓", label: "Curious",    desc: "Ask deeper" },
-  { key: "relatable", emoji: "😤", label: "Relatable",  desc: "Shared pain" },
-  { key: "contrarian",emoji: "🔥", label: "Contrarian", desc: "Hot take" },
+  { key: "curious", emoji: "❓", label: "Curious", desc: "Ask deeper" },
+  { key: "relatable", emoji: "😮‍💨", label: "Relatable", desc: "Shared feeling" },
+  { key: "contrarian", emoji: "🔥", label: "Contrarian", desc: "Hot take" },
+  { key: "supportive", emoji: "💪", label: "Supportive", desc: "Encourage" },
+  { key: "expert", emoji: "🎯", label: "Expert", desc: "Authority" },
+  { key: "visionary", emoji: "🚀", label: "Visionary", desc: "Big picture" },
+  { key: "analytical", emoji: "📊", label: "Analytical", desc: "Data angle" },
+  { key: "meme", emoji: "🐸", label: "Meme", desc: "Internet energy" },
 ];
 
-const DEFAULT_USER_VOICE = [
-  "positive energy, grounded and encouraging",
-  "congratulate people when they share a win or make progress",
-  "share small personal experiences when relevant",
-  "show openness to connect, collaborate, or learn from each other",
-  "keep the reply useful and human, not salesy",
-  "occasionally add a small light joke when it fits naturally",
-].join("\n");
-
-const DEFAULT_VIRAL_STRATEGY = [
-  "Use X-style ranking signals as inspiration for Threads replies: replies, likes, repost/share intent, profile clicks, dwell, and follow intent.",
-  "Avoid negative signals: spammy repetition, copied wording, generic praise, rage bait, blocks, mutes, reports, and not-interested reactions.",
-  "0 to 300 followers: earn trust and profile clicks with relatable observations, tiny personal experiences, and clear niche identity.",
-  "300 to 1000 followers: build recognizable angles with sharper observations, useful disagreement, or concrete follow-ups.",
-  "1000 to 5000 followers: become a concise signal source with pattern recognition, simple frameworks, or lived lessons.",
-  "Make every reply useful to the reader with a small insight, validation, practical angle, or lived observation.",
-  "Keep the energy positive, grounded, and constructive without sounding fake or motivational.",
-  "Build personal branding by quietly showing values, taste, niche, and a consistent way of seeing the world.",
-  "Every reply must be short, lowercase, specific to the post, human, and easy to scan.",
-].join("\n");
+const EDITOR_SELECTOR = '[data-lexical-editor="true"]';
+const REPLY_BOX_SELECTOR = '[role="textbox"][contenteditable="true"]';
+const PRESSABLE_CONTAINER_SELECTOR = "[data-pressable-container]";
+const THREAD_CONTEXT_MAX_CHARS = 3000;
+const formatterHintTimers = new WeakMap();
 
 // ─── DOM Helpers ──────────────────────────────────────────────────────────────
 
@@ -44,19 +35,464 @@ function extractPostId(url) {
   return url?.match(/\/post\/([A-Za-z0-9_-]+)/)?.[1] ?? null;
 }
 
+function toThreadsPath(href, currentLocation = location) {
+  if (!href || typeof href !== "string") return "";
+  try {
+    return new URL(href, currentLocation?.origin || "https://www.threads.com").pathname;
+  } catch {
+    return href;
+  }
+}
+
+function extractPostPathParts(pathname) {
+  const postId = pathname?.match(/\/post\/([A-Za-z0-9_-]+)/)?.[1] ?? null;
+  const authorUsername = pathname?.match(/^\/(@[\w.]+)\//)?.[1] ?? null;
+  return { postId, authorUsername };
+}
+
+function cleanDomText(value) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function uniqueTexts(texts) {
+  return texts.filter((text, index, arr) => arr.indexOf(text) === index);
+}
+
+function normalizeAuthorUsername(value) {
+  const cleanValue = cleanDomText(value);
+  if (!cleanValue) return null;
+  return cleanValue.startsWith("@") ? cleanValue : `@${cleanValue}`;
+}
+
+function extractUsernameFromHref(href, currentLocation = location) {
+  const path = toThreadsPath(href, currentLocation);
+  const match = path.match(/^\/@([\w.]+)/);
+  return match ? normalizeAuthorUsername(match[1]) : null;
+}
+
+function findAuthorLink(links, currentLocation = location) {
+  return links.find(link => {
+    const path = toThreadsPath(link.getAttribute?.("href") || link.href || "", currentLocation);
+    return /^\/@[\w.]+\/?$/.test(path);
+  }) || links.find(link => extractUsernameFromHref(
+    link.getAttribute?.("href") || link.href || "",
+    currentLocation
+  ));
+}
+
+function isUiNoiseText(text, noiseTexts = new Set()) {
+  if (!text || noiseTexts.has(text)) return true;
+  return [
+    /^reply$/i,
+    /^like$/i,
+    /^repost$/i,
+    /^share$/i,
+    /^send$/i,
+    /^view activity$/i,
+    /^top$/i,
+    /^\d+$/,
+    /^\d+[smhdwy]$/i,
+  ].some(pattern => pattern.test(text));
+}
+
+function findMainPostContainer(authorLink) {
+  let container = authorLink;
+  for (let i = 0; i < 8; i += 1) {
+    container = container?.parentElement;
+    if (!container) break;
+  }
+
+  while (
+    container?.parentElement &&
+    Array.from(container.querySelectorAll?.('span[dir="auto"]') ?? []).length <= 1
+  ) {
+    container = container.parentElement;
+  }
+
+  return container;
+}
+
+function buildThreadsPostUrl(currentLocation, authorUsername, postId) {
+  if (!authorUsername || !postId) return null;
+  const origin = currentLocation?.origin || "https://www.threads.com";
+  return `${origin}/${authorUsername}/post/${postId}`;
+}
+
+function extractPostFromPressableContainer(container, currentLocation = location) {
+  if (!container) return null;
+
+  const allLinks = Array.from(container.querySelectorAll?.("a[href]") ?? []);
+  const authorLink = findAuthorLink(allLinks, currentLocation);
+  if (!authorLink) return null;
+
+  const authorUsername = extractUsernameFromHref(
+    authorLink.getAttribute?.("href") || authorLink.href || "",
+    currentLocation
+  );
+  if (!authorUsername) return null;
+
+  const authorName = cleanDomText(authorLink.innerText || authorLink.textContent)
+    || authorUsername.replace(/^@/, "");
+  const postLink = allLinks.find(link => toThreadsPath(
+    link.getAttribute?.("href") || link.href || "",
+    currentLocation
+  ).includes("/post/"));
+  const postPath = toThreadsPath(postLink?.getAttribute?.("href") || postLink?.href || "", currentLocation);
+  const postId = extractPostId(postPath);
+  const postUrl = postId ? buildThreadsPostUrl(currentLocation, authorUsername, postId) : null;
+  const timeEl = container.querySelector?.("time") ?? null;
+  const timeText = cleanDomText(timeEl?.textContent);
+  const noiseTexts = new Set([
+    authorName,
+    authorUsername,
+    authorUsername.replace(/^@/, ""),
+    timeText,
+    "View activityView activity",
+  ].filter(Boolean));
+  const textBlocks = uniqueTexts(Array.from(container.querySelectorAll?.('span[dir="auto"]') ?? [])
+    .map(el => cleanDomText(el.innerText || el.textContent))
+    .filter(text => !isUiNoiseText(text, noiseTexts)));
+
+  return {
+    postId,
+    postUrl,
+    username: authorName,
+    authorUsername,
+    authorName,
+    datetime: timeEl?.getAttribute?.("datetime") ?? null,
+    fullText: textBlocks.join("\n"),
+    textBlocks,
+  };
+}
+
+function getThreadPostBlockElements(root) {
+  const candidates = Array.from(root?.querySelectorAll?.("div") ?? [])
+    .filter(div => findThreadProfileLink(div) && findThreadPostLink(div) && findThreadLikeButton(div));
+
+  const minimalCandidates = candidates.filter(candidate => {
+    const candidatePostId = getThreadBlockPostId(candidate);
+    return !candidates.some(other => (
+      other !== candidate
+      && candidate.contains?.(other)
+      && getThreadBlockPostId(other) === candidatePostId
+    ));
+  });
+
+  const seen = new Set();
+  return minimalCandidates.filter(block => {
+    const postId = getThreadBlockPostId(block);
+    if (!postId || seen.has(postId)) return false;
+    seen.add(postId);
+    return true;
+  });
+}
+
+function findThreadProfileLink(block) {
+  return block?.querySelector?.('a[href^="/@"]:not([href*="/post/"])') ?? null;
+}
+
+function findThreadPostLink(block) {
+  return block?.querySelector?.('a[href*="/post/"]') ?? null;
+}
+
+function findThreadLikeButton(block) {
+  return block?.querySelector?.('[aria-label="Like"], [aria-label="Unlike"]') ?? null;
+}
+
+function getThreadBlockPostId(block) {
+  const postPath = findThreadPostLink(block)?.getAttribute?.("href") || "";
+  return extractPostId(postPath);
+}
+
+function normalizeContextUsername(value) {
+  return normalizeAuthorUsername(value)?.replace(/^@/, "") || "";
+}
+
+function parseThreadContextBlock(block, currentLocation = location, replyBox = null) {
+  if (!block) return null;
+
+  const profileLink = findThreadProfileLink(block);
+  const username = normalizeContextUsername(
+    profileLink?.getAttribute?.("href")?.replace(/^\/@/, "")
+  );
+  const authorUsername = username ? `@${username}` : "";
+  const postAnchor = findThreadPostLink(block);
+  const postPath = toThreadsPath(postAnchor?.getAttribute?.("href") || postAnchor?.href || "", currentLocation);
+  const postId = extractPostId(postPath) || "";
+  const timestampEl = block.querySelector?.("time")
+    || postAnchor?.querySelector?.("span, [aria-hidden]")
+    || postAnchor;
+  const timestamp = cleanDomText(timestampEl?.textContent);
+  const hasComposer = !!block.querySelector?.('[role="none"]') || !!block.contains?.(replyBox);
+  const allTexts = Array.from(block.querySelectorAll?.('[dir="auto"], span, div') ?? [])
+    .map(el => cleanDomText(el.textContent))
+    .filter(Boolean);
+  const isAuthor = allTexts.includes("Author");
+  const hashtags = Array.from(block.querySelectorAll?.('a[href*="serp_type=tags"]') ?? [])
+    .map(a => cleanDomText(a.textContent).replace(/^#/, ""))
+    .filter(Boolean);
+  const linkPreviews = Array.from(block.querySelectorAll?.('a[href^="http"]:not([href*="threads.com"])') ?? [])
+    .map(a => ({
+      url: a.getAttribute?.("href") || a.href || "",
+      title: cleanDomText(a.querySelector?.("div, span")?.textContent || a.textContent),
+    }))
+    .filter(preview => preview.url && preview.title);
+  const previewTitles = new Set(linkPreviews.map(preview => preview.title));
+  const noiseTexts = new Set([
+    username,
+    authorUsername,
+    timestamp,
+    "Like",
+    "Unlike",
+    "Reply",
+    "Replied",
+    "Repost",
+    "Share",
+    "More",
+    "Author",
+    "No replies yet",
+    "View activity",
+    "Attach media",
+    "Add a GIF",
+    "Expand composer",
+  ].filter(Boolean));
+  const contentTexts = Array.from(block.querySelectorAll?.('[dir="auto"]') ?? [])
+    .map(el => cleanDomText(el.textContent))
+    .filter(text => (
+      text.length > 1
+      && !noiseTexts.has(text)
+      && !previewTitles.has(text)
+      && !/^\d+$/.test(text)
+    ));
+  const dedupedContent = contentTexts.filter((text, index) => index === 0 || text !== contentTexts[index - 1]);
+  const isFocal = (!!postId && currentLocation?.pathname?.includes(postId)) || !!block.contains?.(replyBox);
+
+  return {
+    username,
+    authorUsername,
+    postId,
+    postPath,
+    timestamp,
+    isAuthor,
+    hashtags,
+    content: dedupedContent.join("\n"),
+    linkPreviews,
+    isFocal,
+    hasComposer,
+  };
+}
+
+function extractThreadContext(root = document, currentLocation = location, replyBox = null) {
+  const columnBodies = Array.from(root.querySelectorAll?.('[role="region"][aria-label="Column body"]') ?? []);
+  const threadCol = columnBodies[1] || columnBodies[0] || getThreadRegion();
+  if (!threadCol) return [];
+
+  const contexts = getThreadPostBlockElements(threadCol)
+    .map(block => parseThreadContextBlock(block, currentLocation, replyBox))
+    .filter(context => context.username && context.content);
+
+  if (contexts.some(context => context.isFocal) || !replyBox) return contexts;
+
+  const composerBlock = contexts.find(context => context.hasComposer);
+  if (!composerBlock) return contexts;
+  return contexts.map(context => ({
+    ...context,
+    isFocal: context.postId === composerBlock.postId,
+  }));
+}
+
+function buildThreadContextPrompt(contexts, loggedInUser, targetUser) {
+  if (!Array.isArray(contexts) || contexts.length === 0) return "";
+
+  const lines = ["THREAD CONTEXT:", "---"];
+
+  contexts.forEach((context, index) => {
+    const badgeText = context.isAuthor ? " [Thread Author]" : "";
+    const hashtagText = context.hashtags?.length
+      ? ` ${context.hashtags.map(tag => `#${tag.replace(/^#/, "")}`).join(" ")}`
+      : "";
+    const label = context.isFocal
+      ? "[FOCAL POST -- being replied to]"
+      : `[Post ${index + 1}]`;
+
+    lines.push(`${label} @${context.username}${badgeText} (${context.timestamp || "unknown time"})${hashtagText}:`);
+    lines.push(`"${context.content}"`);
+
+    (context.linkPreviews || []).forEach(preview => {
+      lines.push(`  [Link: ${preview.url} -- "${preview.title}"]`);
+    });
+    lines.push("");
+  });
+
+  lines.push("---");
+  lines.push("TASK:");
+  lines.push(`You are @${loggedInUser || "the logged-in user"}, replying to @${targetUser || "the focal author"}'s FOCAL POST above.`);
+  lines.push("Write a short, natural, friendly reply (1-3 sentences max).");
+  lines.push("Match the tone and language of the conversation. No hashtags. No emojis unless the conversation uses them. Plain text only.");
+
+  const prompt = lines.join("\n");
+  if (prompt.length <= THREAD_CONTEXT_MAX_CHARS) return prompt;
+
+  const focalIndex = prompt.indexOf("[FOCAL POST");
+  const taskIndex = prompt.indexOf("TASK:");
+  if (focalIndex === -1 || taskIndex === -1) {
+    return prompt.slice(-THREAD_CONTEXT_MAX_CHARS);
+  }
+
+  const tail = prompt.slice(focalIndex);
+  const truncated = `THREAD CONTEXT:\n---\n[...earlier context truncated...]\n\n${tail}`;
+  return truncated.length > THREAD_CONTEXT_MAX_CHARS
+    ? truncated.slice(-THREAD_CONTEXT_MAX_CHARS)
+    : truncated;
+}
+
+function getLoggedInUserFromComposer(replyBox = null) {
+  const composer = replyBox?.closest?.('[role="none"]')
+    || getThreadRegion()?.querySelector?.('[role="none"]');
+  const avatarImg = composer?.querySelector?.('img[alt*="profile picture"]');
+  const altText = cleanDomText(avatarImg?.getAttribute?.("alt") || avatarImg?.alt);
+  const profileMatch = altText.match(/^(.+)'s profile picture$/);
+  return normalizeContextUsername(profileMatch?.[1] || "");
+}
+
+function postToThreadContext(post, isFocal = false) {
+  const username = normalizeContextUsername(post?.authorUsername || post?.username || post?.authorName);
+  if (!username || !post?.fullText) return null;
+  return {
+    username,
+    authorUsername: `@${username}`,
+    postId: post.postId || "",
+    postPath: post.postUrl || "",
+    timestamp: "",
+    isAuthor: false,
+    hashtags: [],
+    content: post.fullText,
+    linkPreviews: [],
+    isFocal,
+    hasComposer: false,
+  };
+}
+
+function getThreadContextForGeneration(postContext, replyBox = null) {
+  if (!postContext?.postText) return {};
+
+  let contexts = extractThreadContext(document, location, replyBox);
+  if (contexts.length === 0) {
+    const data = scrapeThreadsPostPage();
+    contexts = [
+      postToThreadContext(data?.mainPost, postContext.postId === data?.mainPost?.postId),
+      ...((data?.replies || []).map(reply => postToThreadContext(reply, postContext.postId === reply.postId))),
+    ].filter(Boolean);
+  }
+
+  const targetPostId = postContext.postId || "";
+  const targetUsername = normalizeContextUsername(postContext.authorUsername || postContext.authorName);
+  contexts = contexts.map(context => ({
+    ...context,
+    isFocal: context.isFocal
+      || (!!targetPostId && context.postId === targetPostId)
+      || (!targetPostId && context.username === targetUsername && context.content === postContext.postText),
+  }));
+
+  const focalPost = contexts.find(context => context.isFocal)
+    || contexts.find(context => context.content === postContext.postText)
+    || contexts[contexts.length - 1];
+  const targetUser = focalPost?.username || targetUsername;
+  const loggedInUser = getLoggedInUserFromComposer(replyBox);
+  const threadContext = buildThreadContextPrompt(contexts, loggedInUser, targetUser);
+
+  return {
+    threadContext,
+    targetUser,
+    loggedInUser,
+  };
+}
+
+function withThreadContext(postContext, replyBox = null) {
+  if (!postContext) return null;
+  return {
+    ...postContext,
+    ...getThreadContextForGeneration(postContext, replyBox),
+  };
+}
+
+function scrapeThreadsPostPageFromPressableContainers(root = document, currentLocation = location) {
+  const posts = Array.from(root.querySelectorAll?.(PRESSABLE_CONTAINER_SELECTOR) ?? [])
+    .map(container => extractPostFromPressableContainer(container, currentLocation))
+    .filter(post => post?.authorUsername && post.fullText);
+  const uniquePosts = posts.filter((post, index, arr) => {
+    const key = post.postUrl || `${post.authorUsername}\n${post.fullText}`;
+    return arr.findIndex(candidate => (
+      (candidate.postUrl || `${candidate.authorUsername}\n${candidate.fullText}`) === key
+    )) === index;
+  });
+
+  if (uniquePosts.length === 0) return null;
+
+  return {
+    pageUrl: currentLocation?.href || null,
+    mainPost: uniquePosts[0],
+    replies: uniquePosts.slice(1),
+  };
+}
+
+function extractThreadsPostFromDom(root = document, currentLocation = location) {
+  const { postId, authorUsername } = extractPostPathParts(currentLocation?.pathname);
+  if (!postId || !authorUsername) return null;
+
+  const authorLink = root.querySelector?.(`a[href="/${authorUsername}"]`);
+  if (!authorLink) return null;
+
+  const authorName = cleanDomText(authorLink.innerText || authorLink.textContent)
+    || cleanDomText(authorLink.querySelector?.("span")?.innerText)
+    || authorUsername.replace(/^@/, "");
+  const container = findMainPostContainer(authorLink);
+  const spans = Array.from(container?.querySelectorAll?.('span[dir="auto"]') ?? []);
+  const textBlocks = uniqueTexts(spans
+    .map(span => cleanDomText(span.innerText || span.textContent))
+    .filter(text =>
+      text &&
+      text.length > 5 &&
+      text !== authorName &&
+      text !== authorUsername &&
+      !text.match(/^\d+[hd]$/) &&
+      !text.match(/^\d+$/)
+    ));
+
+  const timeEl = container?.querySelector?.("time") ?? null;
+
+  return {
+    pageUrl: currentLocation?.href || null,
+    mainPost: {
+      postId,
+      postUrl: buildThreadsPostUrl(currentLocation, authorUsername, postId),
+      username: authorName,
+      authorUsername,
+      authorName,
+      datetime: timeEl?.getAttribute?.("datetime") ?? null,
+      fullText: textBlocks.join("\n"),
+      textBlocks,
+    },
+    replies: [],
+  };
+}
+
 function extractPostFromPagelet(pagelet) {
   const allLinks = [...pagelet.querySelectorAll('a[href]')];
   const profileLink = allLinks.find(a => {
     const href = a.getAttribute('href');
     return href?.startsWith('/@') && !href.includes('/post/');
   });
-  const username = profileLink?.textContent.trim() ?? null;
+  const profileHref = profileLink?.getAttribute("href") ?? "";
+  const authorUsername = profileHref.match(/^\/(@[\w.]+)/)?.[1] ?? null;
+  const authorName = cleanDomText(profileLink?.innerText || profileLink?.textContent) || null;
+  const username = authorName;
   const timeEl   = pagelet.querySelector('time');
   const timeText = timeEl?.textContent.trim() ?? null;
   const postLink = allLinks.find(a => a.getAttribute('href')?.includes('/post/'));
   const postUrl  = postLink ? 'https://www.threads.com' + postLink.getAttribute('href') : null;
 
-  const UI_NOISE = new Set([username, timeText, 'Top', 'View activity', 'View activityView activity']);
+  const UI_NOISE = new Set([username, authorUsername, timeText, 'Top', 'View activity', 'View activityView activity']);
   const textBlocks = [...pagelet.querySelectorAll('[dir="auto"]')]
     .map(el => el.textContent.trim())
     .filter(t => t.length > 0 && !UI_NOISE.has(t));
@@ -65,6 +501,8 @@ function extractPostFromPagelet(pagelet) {
     postId: extractPostId(postUrl),
     postUrl,
     username,
+    authorUsername,
+    authorName,
     datetime: timeEl?.getAttribute('datetime') ?? null,
     fullText: textBlocks.join('\n'),
     textBlocks,
@@ -72,28 +510,156 @@ function extractPostFromPagelet(pagelet) {
 }
 
 function scrapeThreadsPostPage() {
+  const directData = extractThreadsPostFromDom(document, location);
+  const pressableData = scrapeThreadsPostPageFromPressableContainers(document, location);
   const region = getThreadRegion();
-  if (!region) return null;
+  if (!region) return pressableData || directData;
   const pagelets = [...region.querySelectorAll('[data-pagelet^="threads_post_page_"]')]
     .filter(p => p.querySelector('[data-interactive-id]'));
-  if (pagelets.length === 0) return null;
+  if (pagelets.length === 0) return pressableData || directData;
   const [mainPagelet, ...replyPagelets] = pagelets;
-  return {
+  const pageletData = {
     pageUrl: location.href,
     mainPost: extractPostFromPagelet(mainPagelet),
     replies: replyPagelets.map(extractPostFromPagelet),
   };
+  const replies = pageletData.replies.length > 0
+    ? pageletData.replies
+    : (pressableData?.replies || []);
+
+  if (directData?.mainPost?.fullText) {
+    return {
+      ...directData,
+      replies,
+    };
+  }
+
+  return {
+    ...pageletData,
+    replies,
+  };
 }
 
 function getActivePostText() {
+  const data = getActivePostContext();
+  if (data?.postText) return data.postText;
+  return null;
+}
+
+function getActivePostContext(replyBox = null) {
+  const replyTargetContext = getReplyTargetContext(replyBox);
+  if (replyTargetContext?.postText) return withThreadContext(replyTargetContext, replyBox);
+
   const data = scrapeThreadsPostPage();
-  if (data?.mainPost?.fullText) return data.mainPost.fullText;
+  if (data?.mainPost?.fullText) {
+    return withThreadContext({
+      postText: data.mainPost.fullText,
+      authorName: data.mainPost.authorName || data.mainPost.username || null,
+      authorUsername: data.mainPost.authorUsername || null,
+      pageUrl: data.pageUrl || location.href,
+      postId: data.mainPost.postId || null,
+    }, replyBox);
+  }
+
   const region = getThreadRegion() || document;
   for (const el of region.querySelectorAll('[dir="auto"]')) {
     const text = el.textContent.trim();
-    if (text.length > 15 && !el.closest('[role="textbox"]') && !el.closest('nav')) return text;
+    if (text.length > 15 && !el.closest('[role="textbox"]') && !el.closest('nav')) {
+      const { postId, authorUsername } = extractPostPathParts(location.pathname);
+      return withThreadContext({
+        postText: text,
+        authorName: authorUsername?.replace(/^@/, "") || null,
+        authorUsername,
+        pageUrl: location.href,
+        postId,
+      }, replyBox);
+    }
   }
   return null;
+}
+
+function getExtensionErrorMessage(error) {
+  const message = error?.message || String(error || "");
+  if (/extension context invalidated/i.test(message)) {
+    return "Chrome reloaded the extension. Refresh this Threads tab and try again.";
+  }
+  return "Extension error: " + message;
+}
+
+function getReplyTargetContext(replyBox) {
+  if (!replyBox) return null;
+
+  const threadBlock = findTargetThreadPostBlock(replyBox);
+  const threadPost = parseThreadContextBlock(threadBlock, location, replyBox);
+  if (threadPost?.content && threadPost.authorUsername) {
+    return {
+      postText: threadPost.content,
+      authorName: threadPost.username,
+      authorUsername: threadPost.authorUsername,
+      pageUrl: threadPost.postPath
+        ? `${location.origin || "https://www.threads.com"}${threadPost.postPath}`
+        : location.href,
+      postId: threadPost.postId || null,
+    };
+  }
+
+  const container = findTargetPressableContainer(replyBox);
+  const post = extractPostFromPressableContainer(container, location);
+  if (!post?.fullText || !post.authorUsername) return null;
+
+  return {
+    postText: post.fullText,
+    authorName: post.authorName || post.username || post.authorUsername.replace(/^@/, ""),
+    authorUsername: post.authorUsername,
+    pageUrl: post.postUrl || location.href,
+    postId: post.postId || null,
+  };
+}
+
+function findTargetThreadPostBlock(replyBox, root = document) {
+  if (!replyBox) return null;
+
+  const searchRoot = getThreadRegion() || root;
+  const blocks = getThreadPostBlockElements(searchRoot);
+  const containingBlock = blocks.find(block => block.contains?.(replyBox));
+  if (containingBlock) return containingBlock;
+
+  const priorBlocks = blocks.filter(block => appearsBeforeInDocumentOrder(block, replyBox, searchRoot));
+  return priorBlocks[priorBlocks.length - 1] || null;
+}
+
+function findTargetPressableContainer(replyBox, root = document) {
+  if (!replyBox) return null;
+
+  const closestContainer = replyBox.closest?.(PRESSABLE_CONTAINER_SELECTOR);
+  if (extractPostFromPressableContainer(closestContainer, location)?.fullText) {
+    return closestContainer;
+  }
+
+  const searchRoot = getThreadRegion() || root;
+  const containers = Array.from(searchRoot.querySelectorAll?.(PRESSABLE_CONTAINER_SELECTOR) ?? [])
+    .filter(container => extractPostFromPressableContainer(container, location)?.fullText);
+  const priorContainers = containers.filter(container => appearsBeforeInDocumentOrder(container, replyBox, searchRoot));
+  return priorContainers[priorContainers.length - 1] || null;
+}
+
+function appearsBeforeInDocumentOrder(candidate, target, root = document) {
+  if (!candidate || !target || candidate === target) return false;
+
+  if (typeof candidate.compareDocumentPosition === "function") {
+    return !!(candidate.compareDocumentPosition(target) & Node.DOCUMENT_POSITION_FOLLOWING);
+  }
+
+  const orderedNodes = [];
+  const visit = node => {
+    orderedNodes.push(node);
+    Array.from(node?.children ?? []).forEach(visit);
+  };
+  visit(root?.body || root);
+
+  const candidateIndex = orderedNodes.indexOf(candidate);
+  const targetIndex = orderedNodes.indexOf(target);
+  return candidateIndex !== -1 && targetIndex !== -1 && candidateIndex < targetIndex;
 }
 
 // ─── Inject Text into Reply Box ───────────────────────────────────────────────
@@ -109,14 +675,53 @@ function moveReplyCursorToEnd(textbox) {
   selection.addRange(range);
 }
 
+function formatHumanComment(rawComment) {
+  if (!rawComment || typeof rawComment !== "string") return null;
+
+  const cleaned = rawComment
+    .trim()
+    .toLowerCase()
+    .replace(/\r\n/g, "\n")
+    .replace(/^[ \t]*[-*•][ \t]+/gm, "")
+    .replace(/([.!?])\s+-\s+/g, "$1\n")
+    .replace(/([.!?])(?=\S)/g, "$1\n")
+    .replace(/[ \t]*[—–][ \t]*/g, ", ")
+    .replace(/[ \t]+-[ \t]+/g, ", ")
+    .replace(/\b(that'?s a great point|this is a great point|i completely agree|this is such an important reminder|in today'?s world|exactly|honestly|definitely|absolutely|dive into)\b[,.!?]?\s*/gi, "")
+    .replace(/[ \t]+/g, " ")
+    .replace(/\n{3,}/g, "\n\n");
+
+  const chunks = cleaned
+    .split(/\n+/)
+    .map(line => line.trim())
+    .filter(Boolean)
+    .flatMap(line => splitIntoSentenceLikeChunks(line));
+
+  if (chunks.length === 0) return null;
+
+  return chunks.slice(0, 3).join("\n\n");
+}
+
+function splitIntoSentenceLikeChunks(text) {
+  const pieces = text
+    .split(/(?<=[.!?])\s*/)
+    .map(piece => piece.trim())
+    .filter(Boolean);
+
+  return pieces.length > 0 ? pieces : [text];
+}
+
 function injectTextIntoReplyBox(textbox, text) {
   try {
+    const formattedText = formatHumanComment(text);
+    if (!formattedText) return false;
+
     textbox.focus();
     textbox.click?.();
 
     textbox.innerHTML = "";
 
-    const lines = String(text || "").replace(/\r\n?/g, "\n").split("\n");
+    const lines = formattedText.replace(/\r\n?/g, "\n").split("\n");
     lines.forEach((line, index) => {
       textbox.appendChild(document.createTextNode(line));
       if (index < lines.length - 1) {
@@ -128,7 +733,7 @@ function injectTextIntoReplyBox(textbox, text) {
       bubbles: true,
       cancelable: true,
       inputType: "insertText",
-      data: text,
+      data: formattedText,
     }));
     textbox.dispatchEvent(new Event("change", { bubbles: true }));
 
@@ -192,13 +797,13 @@ function injectStyles() {
       z-index: 2147483647;
       background: #131314;
       border: 1px solid rgba(255,255,255,0.12);
-      border-radius: 14px;
-      padding: 10px;
-      box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+      border-radius: 16px;
+      padding: 12px;
+      box-shadow: 0 18px 46px rgba(0,0,0,0.48);
       display: flex;
       flex-direction: column;
-      gap: 4px;
-      min-width: 190px;
+      gap: 10px;
+      width: min(352px, calc(100vw - 24px));
       animation: tai-pop 0.15s ease;
     }
     @keyframes tai-pop {
@@ -211,34 +816,66 @@ function injectStyles() {
       letter-spacing: 0.7px;
       text-transform: uppercase;
       color: rgba(255,255,255,0.3);
-      padding: 2px 6px 6px;
+      padding: 2px 2px 0;
       font-family: system-ui, sans-serif;
+    }
+    .tai-tone-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 8px;
     }
     .tai-tone {
       display: flex;
+      flex-direction: column;
       align-items: center;
-      gap: 10px;
-      padding: 8px 10px;
-      border-radius: 8px;
+      justify-content: center;
+      gap: 6px;
+      min-width: 0;
+      min-height: 66px;
+      padding: 8px 5px;
+      border-radius: 12px;
       cursor: pointer;
-      transition: background 0.12s;
-      border: none;
-      background: none;
+      transition: background 0.12s, border-color 0.12s, transform 0.12s;
+      border: 1px solid rgba(255,255,255,0.08);
+      background: rgba(255,255,255,0.035);
+      color: #f0f0f0;
       width: 100%;
-      text-align: left;
+      text-align: center;
     }
     .tai-tone:hover {
-      background: rgba(255,255,255,0.07);
+      background: rgba(255,255,255,0.08);
+      border-color: rgba(200,245,90,0.28);
+      transform: translateY(-1px);
     }
-    .tai-tone-emoji { font-size: 16px; line-height: 1; flex-shrink: 0; }
-    .tai-tone-info  { display: flex; flex-direction: column; gap: 1px; }
-    .tai-tone-name  { font-size: 13px; font-weight: 600; color: #f0f0f0; font-family: system-ui, sans-serif; }
-    .tai-tone-desc  { font-size: 11px; color: rgba(255,255,255,0.4); font-family: system-ui, sans-serif; }
+    .tai-tone-icon {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 30px;
+      height: 30px;
+      border-radius: 10px;
+      background: rgba(255,255,255,0.06);
+      font-size: 21px;
+      line-height: 1;
+      flex-shrink: 0;
+    }
+    .tai-tone-name {
+      width: 100%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-size: 10.5px;
+      font-weight: 700;
+      color: #f0f0f0;
+      font-family: system-ui, sans-serif;
+      line-height: 1.1;
+    }
 
     /* Loading spinner inside tone button */
     .tai-spin {
       display: inline-block;
-      width: 10px; height: 10px;
+      width: 14px; height: 14px;
       border: 2px solid rgba(200,245,90,0.3);
       border-top-color: #c8f55a;
       border-radius: 50%;
@@ -256,8 +893,38 @@ function injectStyles() {
       font-family: system-ui, sans-serif;
       line-height: 1.4;
     }
+    .tai-format-hint {
+      position: fixed;
+      right: 18px;
+      z-index: 2147483647;
+      color: #f8fafc;
+      border: 1px solid rgba(255,255,255,0.12);
+      box-shadow: 0 12px 30px rgba(0,0,0,0.38);
+      font-family: system-ui, sans-serif;
+      backdrop-filter: blur(12px);
+    }
+    .tai-format-hint {
+      bottom: 42px;
+      max-width: 260px;
+      padding: 7px 10px;
+      border-radius: 999px;
+      background: rgba(19, 19, 20, 0.9);
+      color: #c8f55a;
+      font-size: 12px;
+      font-weight: 700;
+      display: none;
+    }
   `;
   document.head.appendChild(style);
+}
+
+function getToneIconMarkup(tone) {
+  return `<span class="tai-tone-icon tai-tone-emoji" aria-hidden="true">${tone.emoji || "✦"}</span>`;
+}
+
+function restoreToneIcon(button, tone) {
+  const icon = button.querySelector(".tai-tone-icon");
+  if (icon) icon.outerHTML = getToneIconMarkup(tone);
 }
 
 // Find the icon row next to a reply box (the row with GIF, image buttons)
@@ -322,21 +989,25 @@ function showTonePanel(anchorBtn, replyBox) {
   title.textContent = "Pick a tone";
   panel.appendChild(title);
 
+  const toneGrid = document.createElement("div");
+  toneGrid.className = "tai-tone-grid";
+  panel.appendChild(toneGrid);
+
   TONES.forEach(tone => {
     const btn = document.createElement("button");
     btn.className = "tai-tone";
+    btn.type = "button";
+    btn.title = `${tone.label} - ${tone.desc}`;
+    btn.setAttribute("aria-label", `${tone.label}: ${tone.desc}`);
     btn.innerHTML = `
-      <span class="tai-tone-emoji">${tone.emoji}</span>
-      <span class="tai-tone-info">
-        <span class="tai-tone-name">${tone.label}</span>
-        <span class="tai-tone-desc">${tone.desc}</span>
-      </span>
+      ${getToneIconMarkup(tone)}
+      <span class="tai-tone-name">${tone.label}</span>
     `;
     btn.addEventListener("click", (e) => {
       e.stopPropagation();
       generateAndFill(tone, replyBox, panel, anchorBtn);
     });
-    panel.appendChild(btn);
+    toneGrid.appendChild(btn);
   });
 
   // Position panel above the anchor button
@@ -344,9 +1015,22 @@ function showTonePanel(anchorBtn, replyBox) {
   activePanel = panel;
 
   const rect = anchorBtn.getBoundingClientRect();
-  const panelH = panel.offsetHeight || 220;
-  panel.style.left = `${rect.left + window.scrollX}px`;
-  panel.style.top  = `${rect.top + window.scrollY - panelH - 8}px`;
+  const scrollX = window.scrollX || 0;
+  const scrollY = window.scrollY || 0;
+  const viewportWidth = window.innerWidth || document.documentElement?.clientWidth || 360;
+  const panelW = panel.offsetWidth || 352;
+  const panelH = panel.offsetHeight || 260;
+  const gutter = 12;
+  const minLeft = scrollX + gutter;
+  const maxLeft = scrollX + viewportWidth - panelW - gutter;
+  const preferredLeft = rect.left + scrollX - 8;
+  const left = Math.min(Math.max(preferredLeft, minLeft), Math.max(minLeft, maxLeft));
+  let top = rect.top + scrollY - panelH - 10;
+  if (top < scrollY + gutter) {
+    top = rect.bottom + scrollY + 10;
+  }
+  panel.style.left = `${left}px`;
+  panel.style.top = `${top}px`;
 
   // Close on outside click
   setTimeout(() => {
@@ -361,34 +1045,20 @@ async function generateAndFill(tone, replyBox, panel, anchorBtn) {
     .find(b => b.querySelector(".tai-tone-name")?.textContent === tone.label);
   if (clickedBtn) {
     clickedBtn.style.opacity = "1";
-    clickedBtn.querySelector(".tai-tone-emoji").innerHTML = `<span class="tai-spin"></span>`;
+    const icon = clickedBtn.querySelector(".tai-tone-icon");
+    if (icon) icon.outerHTML = '<span class="tai-tone-icon"><span class="tai-spin"></span></span>';
   }
   anchorBtn.classList.add("loading");
 
-  // Get post text
-  const postText = getActivePostText();
-  if (!postText) {
+  // Get post context
+  const postContext = getActivePostContext(replyBox);
+  if (!postContext?.postText) {
     showPanelError(panel, "Could not read post text. Try refreshing.");
     anchorBtn.classList.remove("loading");
     return;
   }
-
-  // Get settings
-  const {
-    openaiKey,
-    openaiModel,
-    userVoice,
-    viralStrategy,
-    useViralStrategy,
-  } = await chrome.storage.local.get([
-    "openaiKey",
-    "openaiModel",
-    "userVoice",
-    "viralStrategy",
-    "useViralStrategy",
-  ]);
-  if (!openaiKey) {
-    showPanelError(panel, "No API key — click the extension icon ✦ to add it.");
+  if (!postContext.authorName || !postContext.authorUsername) {
+    showPanelError(panel, "Could not read author details. Try refreshing.");
     anchorBtn.classList.remove("loading");
     return;
   }
@@ -399,11 +1069,13 @@ async function generateAndFill(tone, replyBox, panel, anchorBtn) {
     const response = await chrome.runtime.sendMessage({
       type: "GENERATE_COMMENT",
       tone: tone.key,
-      postText,
-      apiKey: openaiKey,
-      model: openaiModel || "gpt-4o-mini",
-      userVoice: userVoice || DEFAULT_USER_VOICE,
-      viralStrategy: useViralStrategy === false ? "" : (viralStrategy || DEFAULT_VIRAL_STRATEGY),
+      postText: postContext.postText,
+      authorName: postContext.authorName,
+      authorUsername: postContext.authorUsername,
+      pageUrl: postContext.pageUrl,
+      threadContext: postContext.threadContext,
+      targetUser: postContext.targetUser,
+      loggedInUser: postContext.loggedInUser,
     });
 
     if (response.error) {
@@ -413,7 +1085,7 @@ async function generateAndFill(tone, replyBox, panel, anchorBtn) {
     }
     comment = response.comment;
   } catch (err) {
-    showPanelError(panel, "Extension error: " + err.message);
+    showPanelError(panel, getExtensionErrorMessage(err));
     anchorBtn.classList.remove("loading");
     return;
   }
@@ -441,13 +1113,76 @@ function showPanelError(panel, msg) {
   // Restore emojis
   TONES.forEach((t, i) => {
     const btns = panel.querySelectorAll(".tai-tone");
-    if (btns[i]) btns[i].querySelector(".tai-tone-emoji").textContent = t.emoji;
+    if (btns[i]) restoreToneIcon(btns[i], t);
   });
 
   const err = document.createElement("div");
   err.className = "tai-error";
   err.textContent = msg;
   panel.appendChild(err);
+}
+
+// ─── Comment Formatter: Shift+Enter New Line ────────────────────────────────
+
+function getFormatHintUI() {
+  let ui = document.getElementById("threads-format-hint");
+  if (ui) return ui;
+
+  ui = document.createElement("div");
+  ui.id = "threads-format-hint";
+  ui.className = "tai-format-hint";
+  ui.textContent = "Nhấn Shift+Enter để xuống dòng mới";
+  document.body.appendChild(ui);
+  return ui;
+}
+
+function maybeShowSentenceEndHint(editor) {
+  const text = String(editor.innerText || editor.textContent || "");
+  if (!/[.!?]\s$/.test(text)) return;
+
+  const ui = getFormatHintUI();
+  ui.style.display = "block";
+
+  const existingTimer = formatterHintTimers.get(editor);
+  if (existingTimer) clearTimeout(existingTimer);
+  formatterHintTimers.set(editor, setTimeout(() => {
+    ui.style.display = "none";
+  }, 2200));
+}
+
+function insertFormatterNewLine(editor) {
+  editor.focus?.();
+  const inserted = document.execCommand?.("insertParagraph", false, null);
+  if (!inserted) {
+    document.execCommand?.("insertLineBreak", false, null);
+  }
+  editor.dispatchEvent?.(new InputEvent("input", {
+    bubbles: true,
+    cancelable: true,
+    inputType: "insertParagraph",
+    data: null,
+  }));
+}
+
+function handleFormatterKeydown(event, editor) {
+  if (event.key !== "Enter" || !event.shiftKey) return;
+
+  event.preventDefault();
+  event.stopImmediatePropagation?.();
+  insertFormatterNewLine(editor);
+
+  const hint = document.getElementById("threads-format-hint");
+  if (hint) hint.style.display = "none";
+}
+
+function attachCommentFormatter(editor) {
+  if (!editor || editor.dataset.taiFormatterInjected === "1") return;
+
+  editor.dataset.taiFormatterInjected = "1";
+  editor.addEventListener("keydown", event => handleFormatterKeydown(event, editor), true);
+  editor.addEventListener("input", () => {
+    maybeShowSentenceEndHint(editor);
+  }, true);
 }
 
 // ─── Observer: watch for reply boxes appearing ────────────────────────────────
@@ -461,12 +1196,15 @@ function debounce(fn, ms) {
 }
 
 function scanAndInject() {
-  const replyBoxes = document.querySelectorAll('[role="textbox"][contenteditable="true"]');
+  const replyBoxes = document.querySelectorAll(REPLY_BOX_SELECTOR);
   replyBoxes.forEach(rb => {
     if (rb.dataset.taiInjected) return; // skip already-processed boxes
     rb.dataset.taiInjected = "1";
     injectAIButton(rb);
   });
+
+  const editors = document.querySelectorAll(EDITOR_SELECTOR);
+  editors.forEach(attachCommentFormatter);
 }
 
 // Initial scan
@@ -489,9 +1227,13 @@ observer.observe(document.body, {
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg.type === "GET_POST_TEXT" || msg.action === "SCRAPE_NOW") {
     const data = scrapeThreadsPostPage();
-    const text = data?.mainPost?.fullText || getActivePostText();
-    sendResponse({ text: text || null, url: location.href,
-      postId: data?.mainPost?.postId || null, username: data?.mainPost?.username || null,
+    const context = getActivePostContext();
+    sendResponse({ text: context?.postText || null, url: location.href,
+      postId: context?.postId || data?.mainPost?.postId || null,
+      username: data?.mainPost?.username || context?.authorName || null,
+      authorName: context?.authorName || data?.mainPost?.authorName || null,
+      authorUsername: context?.authorUsername || data?.mainPost?.authorUsername || null,
+      pageUrl: context?.pageUrl || location.href,
       success: !!data, data });
     return false;
   }
@@ -509,5 +1251,11 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   return true;
 });
 
-window.__threadsAI = { scrapeThreadsPostPage, getActivePostText, typeInReplyBox };
+window.__threadsAI = {
+  scrapeThreadsPostPage,
+  extractThreadsPostFromDom,
+  getActivePostText,
+  getActivePostContext,
+  typeInReplyBox,
+};
 console.log("[Threads AI] Content script ready ✦");

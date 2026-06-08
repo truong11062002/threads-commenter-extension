@@ -1,25 +1,34 @@
 // background.js — Service Worker
-// Handles OpenAI API calls (avoids CORS issues from content scripts)
+// Handles backend API calls (avoids CORS issues from content scripts)
+
+const API_BASE_URL = "https://threads-commenter-extension.fastapicloud.dev";
 
 const TONE_CONFIGS = {
   simple: {
-    label: "▫ Simple",
+    label: "💬 Simple",
     temperature: 0.55,
     systemPrompt: `You are a clear, friendly social commenter.
 Write a SHORT comment (1-2 sentences) that is simple, easy to understand, and useful.
 Avoid trying to sound clever. If a tiny joke fits naturally, add it lightly.
 Use the same language as the post.`,
   },
+  friendly: {
+    label: "😊 Friendly",
+    temperature: 0.65,
+    systemPrompt: `You are warm, natural, and easy to talk to.
+Write a SHORT comment (1-2 sentences) that feels friendly, approachable, and specific to the post.
+Avoid generic praise. Use the same language as the post.`,
+  },
   funny: {
-    label: "😂 Funny / Meme",
+    label: "😂 Funny",
     temperature: 0.92,
-    systemPrompt: `You are a witty internet commenter with sharp humor. 
+    systemPrompt: `You are a witty internet commenter with sharp humor.
 Write a SHORT, punchy comment (1-2 sentences max) that is funny, uses internet culture, memes, or clever wordplay.
 Be genuine and context-aware — not random. Think Twitter/X reply energy but on Threads.
 No hashtags. No emojis unless they land perfectly. Use the same language as the post.`,
   },
   insightful: {
-    label: "🧠 Insightful / Smart take",
+    label: "🧠 Insightful",
     temperature: 0.6,
     systemPrompt: `You are a thoughtful person who adds genuine value to conversations.
 Write a SHORT comment (1-3 sentences) that provides real insight, a smart observation, or connects this to a bigger picture.
@@ -27,7 +36,7 @@ Sound like a knowledgeable friend, not a professor. No filler phrases like "Grea
 Use the same language as the post.`,
   },
   curious: {
-    label: "❓ Curious / Question-driven",
+    label: "❓ Curious",
     temperature: 0.7,
     systemPrompt: `You are genuinely curious and ask great follow-up questions.
 Write a SHORT comment (1-2 sentences) that asks a genuinely interesting question sparked by this post.
@@ -35,19 +44,54 @@ The question should make the author want to reply. Not basic, not obvious — di
 Use the same language as the post.`,
   },
   relatable: {
-    label: "😤 Relatable / Shared pain",
+    label: "😮‍💨 Relatable",
     temperature: 0.8,
     systemPrompt: `You are someone who deeply relates to this post and wants to express solidarity.
 Write a SHORT, authentic comment (1-2 sentences) that expresses genuine relatability — shared experience, validation, or "me too" energy.
 Sound human and warm. No corporate positivity. Use the same language as the post.`,
   },
   contrarian: {
-    label: "🔥 Contrarian / Hot take",
+    label: "🔥 Contrarian",
     temperature: 0.85,
     systemPrompt: `You are intellectually provocative but not toxic. You respectfully challenge assumptions.
 Write a SHORT comment (1-2 sentences) that offers a counterpoint or unpopular-but-defensible perspective.
 Be bold, not rude. Make people think. Don't just disagree to disagree — have a real angle.
 Use the same language as the post.`,
+  },
+  supportive: {
+    label: "💪 Supportive",
+    temperature: 0.68,
+    systemPrompt: `You are supportive without sounding fake or overly motivational.
+Write a SHORT comment (1-2 sentences) that encourages the author with a specific reason or observation.
+Keep it grounded and human. Use the same language as the post.`,
+  },
+  expert: {
+    label: "🎯 Expert",
+    temperature: 0.58,
+    systemPrompt: `You are an expert adding a concise, credible perspective.
+Write a SHORT comment (1-2 sentences) that gives a practical, high-signal take.
+Avoid jargon and lecturing. Use the same language as the post.`,
+  },
+  visionary: {
+    label: "🚀 Visionary",
+    temperature: 0.78,
+    systemPrompt: `You see the bigger picture and future implications.
+Write a SHORT comment (1-2 sentences) that connects the post to a larger trend, possibility, or direction.
+Make it inspiring but not grandiose. Use the same language as the post.`,
+  },
+  analytical: {
+    label: "📊 Analytical",
+    temperature: 0.52,
+    systemPrompt: `You think in patterns, tradeoffs, and evidence.
+Write a SHORT comment (1-2 sentences) that adds a clear analytical angle or useful distinction.
+Keep it human and easy to read. Use the same language as the post.`,
+  },
+  meme: {
+    label: "🐸 Meme",
+    temperature: 0.95,
+    systemPrompt: `You are playful and fluent in internet meme energy.
+Write a SHORT comment (1 sentence if possible) that feels like a natural meme-style reply to this post.
+Be context-aware, not random. Use the same language as the post.`,
   },
 };
 
@@ -104,10 +148,20 @@ Follower milestone strategy:
 For every milestone, the best reply is short, specific, human, and conversation-worthy.`;
 
 // Listen for messages from popup or content script
-chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
   if (request.type === "GENERATE_COMMENT") {
     handleGenerateComment(request, sendResponse);
-    return true; // Keep channel open for async response
+    return true;
+  }
+
+  if (request.type === "GET_PREFERENCES") {
+    handleGetPreferences(sendResponse);
+    return true;
+  }
+
+  if (request.type === "SAVE_PREFERENCES") {
+    handleSavePreferences(request, sendResponse);
+    return true;
   }
 
   if (request.type === "GET_TONES") {
@@ -121,106 +175,140 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 });
 
-async function handleGenerateComment(request, sendResponse) {
-  const { tone, postText, apiKey } = request;
-  const userVoice = typeof request.userVoice === "string" && request.userVoice.trim()
-    ? request.userVoice.trim()
-    : DEFAULT_USER_VOICE;
-  const viralStrategy = typeof request.viralStrategy === "string" ? request.viralStrategy.trim() : "";
-  const model = request.model || "gpt-4o-mini";
+async function getDeviceId() {
+  const { deviceId } = await chrome.storage.local.get("deviceId");
+  if (deviceId) return deviceId;
 
-  if (!apiKey) {
-    sendResponse({ error: "No API key set. Please add your OpenAI key in settings." });
-    return;
-  }
+  const newId = crypto.randomUUID();
+  await chrome.storage.local.set({ deviceId: newId });
+  return newId;
+}
 
-  if (!postText || postText.trim().length < 5) {
-    sendResponse({ error: "Could not extract post text. Try clicking directly on a post." });
-    return;
-  }
+async function handleGetPreferences(sendResponse) {
+  try {
+    const deviceId = await getDeviceId();
+    const response = await fetch(`${API_BASE_URL}/api/preferences?deviceId=${encodeURIComponent(deviceId)}`, {
+      method: "GET",
+      headers: { accept: "application/json" },
+    });
+    const data = await readJson(response);
 
-  const config = TONE_CONFIGS[tone];
-  if (!config) {
-    sendResponse({ error: "Invalid tone selected." });
-    return;
+    if (!response.ok || data?.ok === false) {
+      sendResponse({
+        error: readApiError(data, response) || "Could not load preferences.",
+      });
+      return;
+    }
+
+    sendResponse({
+      preferences: normalizePreferences(data?.preferences, deviceId),
+    });
+  } catch (err) {
+    sendResponse({ error: `Network error: ${err.message}` });
   }
+}
+
+async function handleSavePreferences(request, sendResponse) {
+  const deviceId = await getDeviceId();
+  const payload = {
+    deviceId,
+    userVoice: cleanString(request.userVoice),
+    viralStrategy: cleanString(request.viralStrategy),
+    useViralStrategy: request.useViralStrategy !== false,
+  };
 
   try {
-    const voiceInstruction = userVoice
-      ? `\n\nUser voice to follow:\n${userVoice}\n\nAdapt the reply to this voice: match the user's vocabulary, casual/formal level, language preference, rhythm, humor, boundaries, and personality. Keep it authentic; do not mention that you are following a voice profile.`
-      : "";
-
-    const viralInstruction = viralStrategy
-      ? `\n\nThreads comment strategy:\n${viralStrategy}\n\nUse this as a quality strategy, not as manipulation. The comment should invite real back-and-forth when natural, add context or a fresh angle, and avoid engagement bait or spam.`
-      : "";
-
-    if (usesResponsesApi(model)) {
-      const response = await fetch("https://api.openai.com/v1/responses", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify({
-          model,
-          max_output_tokens: 150,
-          instructions: config.systemPrompt + voiceInstruction + viralInstruction + HUMAN_COMMENT_STYLE_PROMPT + X_ALGORITHM_GROWTH_PROMPT,
-          input: `Here is the Threads post to comment on:\n\n"${postText}"\n\nWrite your comment now. Just the comment text, nothing else.`,
-        }),
-      });
-
-      if (!response.ok) {
-        const err = await readOpenAIError(response);
-        sendResponse({ error: `OpenAI error: ${err.error?.message || response.statusText}` });
-        return;
-      }
-
-      const data = await response.json();
-      const comment = formatHumanComment(extractResponseText(data));
-
-      if (!comment) {
-        sendResponse({ error: "Empty response from AI. Try again." });
-        return;
-      }
-
-      sendResponse({ comment });
-      return;
-    }
-
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
+    const response = await fetch(`${API_BASE_URL}/api/preferences`, {
+      method: "PUT",
       headers: {
+        accept: "application/json",
         "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
       },
-      body: JSON.stringify({
-        model,
-        max_tokens: 150,
-        temperature: config.temperature,
-        messages: [
-          {
-            role: "system",
-            content: config.systemPrompt + voiceInstruction + viralInstruction + HUMAN_COMMENT_STYLE_PROMPT + X_ALGORITHM_GROWTH_PROMPT,
-          },
-          {
-            role: "user",
-            content: `Here is the Threads post to comment on:\n\n"${postText}"\n\nWrite your comment now. Just the comment text, nothing else.`,
-          },
-        ],
-      }),
+      body: JSON.stringify(payload),
     });
+    const data = await readJson(response);
 
-    if (!response.ok) {
-      const err = await readOpenAIError(response);
-      sendResponse({ error: `OpenAI error: ${err.error?.message || response.statusText}` });
+    if (!response.ok || data?.ok === false) {
+      sendResponse({
+        error: readApiError(data, response) || "Could not save preferences.",
+      });
       return;
     }
 
-    const data = await response.json();
-    const comment = formatHumanComment(data.choices?.[0]?.message?.content);
+    const preferences = normalizePreferences(data?.preferences || payload, deviceId);
+    await chrome.storage.local.set({
+      userVoice: preferences.userVoice,
+      viralStrategy: preferences.viralStrategy,
+      useViralStrategy: preferences.useViralStrategy,
+    });
+    sendResponse({ preferences });
+  } catch (err) {
+    sendResponse({ error: `Network error: ${err.message}` });
+  }
+}
 
+async function handleGenerateComment(request, sendResponse) {
+  const postText = cleanString(request.postText);
+  const tone = cleanString(request.tone);
+  const authorName = cleanString(request.authorName);
+  const authorUsername = normalizeAuthorUsername(request.authorUsername);
+
+  if (!postText || postText.length < 5 || postText.length > 4000) {
+    sendResponse({ error: "Post text must be 5-4000 characters." });
+    return;
+  }
+
+  if (!authorName || !authorUsername) {
+    sendResponse({ error: "Could not extract author details. Try refreshing the Threads post." });
+    return;
+  }
+
+  if (!TONE_CONFIGS[tone]) {
+    sendResponse({ error: "Unsupported tone" });
+    return;
+  }
+
+  const deviceId = await getDeviceId();
+
+  const payload = {
+    postText,
+    authorName,
+    authorUsername,
+    tone,
+    deviceId,
+  };
+
+  const pageUrl = cleanString(request.pageUrl);
+  const userVoice = cleanString(request.userVoice);
+  const viralStrategy = cleanString(request.viralStrategy);
+  const threadContext = cleanString(request.threadContext);
+  const targetUser = cleanString(request.targetUser);
+  const loggedInUser = cleanString(request.loggedInUser);
+  if (pageUrl) payload.pageUrl = pageUrl;
+  if (userVoice) payload.userVoice = userVoice;
+  if (viralStrategy) payload.viralStrategy = viralStrategy;
+  if (threadContext) payload.threadContext = threadContext;
+  if (targetUser) payload.targetUser = targetUser;
+  if (loggedInUser) payload.loggedInUser = loggedInUser;
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/comments/generate`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const data = await readJson(response);
+
+    if (!response.ok || data?.ok === false) {
+      sendResponse({
+        error: readApiError(data, response) || "Generation failed.",
+      });
+      return;
+    }
+
+    const comment = formatHumanComment(data?.comment);
     if (!comment) {
-      sendResponse({ error: "Empty response from AI. Try again." });
+      sendResponse({ error: "Empty response from API. Try again." });
       return;
     }
 
@@ -230,23 +318,40 @@ async function handleGenerateComment(request, sendResponse) {
   }
 }
 
-function usesResponsesApi(model) {
-  return /^gpt-5(\.|-|$)/.test(model);
+function cleanString(value) {
+  return typeof value === "string" ? value.trim() : "";
 }
 
-function extractResponseText(data) {
-  if (typeof data.output_text === "string" && data.output_text.trim()) {
-    return data.output_text.trim();
+function normalizeAuthorUsername(value) {
+  const username = cleanString(value);
+  if (!username) return "";
+  return username.startsWith("@") ? username : `@${username}`;
+}
+
+function normalizePreferences(rawPreferences, fallbackDeviceId) {
+  return {
+    deviceId: cleanString(rawPreferences?.deviceId) || fallbackDeviceId,
+    userVoice: cleanString(rawPreferences?.userVoice),
+    viralStrategy: cleanString(rawPreferences?.viralStrategy),
+    useViralStrategy: rawPreferences?.useViralStrategy !== false,
+  };
+}
+
+async function readJson(response) {
+  try {
+    return await response.json();
+  } catch {
+    return null;
   }
+}
 
-  const outputText = data.output
-    ?.flatMap(item => item.content || [])
-    ?.filter(content => content.type === "output_text" && typeof content.text === "string")
-    ?.map(content => content.text)
-    ?.join("")
-    ?.trim();
-
-  return outputText || null;
+function readApiError(data, response) {
+  return data?.error?.message
+    || data?.detail?.message
+    || (typeof data?.detail === "string" ? data.detail : "")
+    || data?.message
+    || response?.statusText
+    || "";
 }
 
 function formatHumanComment(rawComment) {
@@ -283,12 +388,4 @@ function splitIntoSentenceLikeChunks(text) {
     .filter(Boolean);
 
   return pieces.length > 0 ? pieces : [text];
-}
-
-async function readOpenAIError(response) {
-  try {
-    return await response.json();
-  } catch {
-    return { error: { message: response.statusText } };
-  }
 }
