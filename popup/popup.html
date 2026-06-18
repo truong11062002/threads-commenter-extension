@@ -23,6 +23,17 @@
     <!-- Config Section -->
     <div class="config-section" id="settingsPanel">
 
+      <!-- Model row -->
+      <div class="config-row">
+        <label class="config-label" for="modelSelect">Model</label>
+        <div class="model-select-wrap">
+          <select id="modelSelect" class="model-select">
+            <option value="">Loading models...</option>
+          </select>
+        </div>
+        <div class="config-hint" id="modelStatus">Loading available models</div>
+      </div>
+
       <!-- User voice row -->
       <div class="config-row">
         <label class="config-label" for="userVoiceInput">Your voice</label>
@@ -46,13 +57,13 @@
           id="viralStrategyInput"
           class="voice-input"
           rows="4"
-          placeholder="Example: Add a specific angle, invite thoughtful replies, and ask a concrete follow-up question when natural..."
+          placeholder="Example: Add a specific angle, make a grounded observation, and leave room for thoughtful replies..."
           spellcheck="false"
         ></textarea>
         <div class="template-grid" aria-label="Strategy templates">
           <button class="template-btn" id="sparkReplyTemplateBtn" type="button">
-            <span class="template-title">Spark Reply</span>
-            <span class="template-sub">Open question hook</span>
+            <span class="template-title">Specific Reply</span>
+            <span class="template-sub">Observation-first reply</span>
           </button>
           <button class="template-btn" id="valueDropTemplateBtn" type="button">
             <span class="template-title">Value Drop</span>

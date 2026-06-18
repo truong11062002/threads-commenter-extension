@@ -34,8 +34,8 @@ assert.doesNotMatch(popupCss, /\/\* popup\.css — Dark editorial aesthetic \*\/
 
 assert.match(popupHtml, /id="settingsPanel"/);
 assert.match(popupHtml, /id="sparkReplyTemplateBtn"/);
-assert.match(popupHtml, /Spark Reply/);
-assert.match(popupHtml, /Open question hook/);
+assert.match(popupHtml, /Specific Reply/);
+assert.match(popupHtml, /Observation-first reply/);
 assert.match(popupHtml, /id="valueDropTemplateBtn"/);
 assert.match(popupHtml, /Value Drop/);
 assert.match(popupHtml, /Add value \+ soft CTA/);
@@ -80,7 +80,7 @@ assert.match(storeListing, /Generate on-brand Threads replies in your voice/);
 assert.match(storeListing, /12 tone options/);
 assert.match(storeListing, /Your voice/);
 assert.match(storeListing, /Threads comment strategy/);
-assert.match(storeListing, /Spark Reply/);
+assert.match(storeListing, /Specific Reply/);
 assert.match(storeListing, /Value Drop/);
 assert.match(storeListing, /Hot Take/);
 assert.doesNotMatch(storeListing, /5 high-engagement tones/i);

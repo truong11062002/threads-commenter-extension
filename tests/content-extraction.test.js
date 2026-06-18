@@ -543,10 +543,44 @@ async function testGenerateShowsRefreshMessageWhenExtensionContextInvalidated() 
   );
 }
 
+async function testGenerateShowsRefreshMessageWhenRuntimeMissing() {
+  usePressableFixture();
+  context.chrome.runtime = undefined;
+
+  let panelError = null;
+  const panel = {
+    querySelector: () => null,
+    querySelectorAll: () => [],
+    appendChild(node) {
+      panelError = node.textContent;
+      return node;
+    },
+  };
+  const anchorBtn = {
+    classList: {
+      add() {},
+      remove() {},
+    },
+  };
+
+  await context.generateAndFill(
+    { key: "friendly", label: "Friendly" },
+    replyBox,
+    panel,
+    anchorBtn
+  );
+
+  assert.equal(
+    panelError,
+    "Chrome reloaded the extension. Refresh this Threads tab and try again."
+  );
+}
+
 async function runGenerateTests() {
   await testGenerateUsesReplyBoxTargetContext();
   await testGenerateSendsFullThreadContext();
   await testGenerateShowsRefreshMessageWhenExtensionContextInvalidated();
+  await testGenerateShowsRefreshMessageWhenRuntimeMissing();
 }
 
 runGenerateTests().catch(error => {

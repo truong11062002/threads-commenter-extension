@@ -23,6 +23,7 @@ const REPLY_BOX_SELECTOR = '[role="textbox"][contenteditable="true"]';
 const PRESSABLE_CONTAINER_SELECTOR = "[data-pressable-container]";
 const THREAD_CONTEXT_MAX_CHARS = 3000;
 const formatterHintTimers = new WeakMap();
+const REPLY_COMPOSER_PLACEHOLDER = "Empty text field. Type to compose a new post.";
 
 // ─── DOM Helpers ──────────────────────────────────────────────────────────────
 
@@ -580,10 +581,22 @@ function getActivePostContext(replyBox = null) {
 
 function getExtensionErrorMessage(error) {
   const message = error?.message || String(error || "");
-  if (/extension context invalidated/i.test(message)) {
+  if (
+    /extension context invalidated/i.test(message)
+    || /extension runtime unavailable/i.test(message)
+    || /cannot read properties of undefined \(reading 'sendMessage'\)/i.test(message)
+  ) {
     return "Chrome reloaded the extension. Refresh this Threads tab and try again.";
   }
   return "Extension error: " + message;
+}
+
+async function sendRuntimeMessage(message) {
+  if (typeof chrome === "undefined" || typeof chrome.runtime?.sendMessage !== "function") {
+    throw new Error("Extension runtime unavailable.");
+  }
+
+  return chrome.runtime.sendMessage(message);
 }
 
 function getReplyTargetContext(replyBox) {
@@ -711,6 +724,35 @@ function splitIntoSentenceLikeChunks(text) {
   return pieces.length > 0 ? pieces : [text];
 }
 
+function clearEditorWithNativeCommands() {
+  const execCommand = document.execCommand?.bind(document);
+  if (!execCommand) return false;
+
+  execCommand("selectAll");
+  execCommand("delete");
+  return true;
+}
+
+function insertTextWithEditorCommands(textbox, formattedText) {
+  const execCommand = document.execCommand?.bind(document);
+  if (!execCommand) return false;
+
+  clearEditorWithNativeCommands();
+  return execCommand("insertText", false, formattedText) !== false;
+}
+
+function insertTextWithDomFallback(textbox, formattedText) {
+  textbox.innerHTML = "";
+
+  const lines = formattedText.replace(/\r\n?/g, "\n").split("\n");
+  lines.forEach((line, index) => {
+    textbox.appendChild(document.createTextNode(line));
+    if (index < lines.length - 1) {
+      textbox.appendChild(document.createElement("br"));
+    }
+  });
+}
+
 function injectTextIntoReplyBox(textbox, text) {
   try {
     const formattedText = formatHumanComment(text);
@@ -719,15 +761,9 @@ function injectTextIntoReplyBox(textbox, text) {
     textbox.focus();
     textbox.click?.();
 
-    textbox.innerHTML = "";
-
-    const lines = formattedText.replace(/\r\n?/g, "\n").split("\n");
-    lines.forEach((line, index) => {
-      textbox.appendChild(document.createTextNode(line));
-      if (index < lines.length - 1) {
-        textbox.appendChild(document.createElement("br"));
-      }
-    });
+    if (!insertTextWithEditorCommands(textbox, formattedText)) {
+      insertTextWithDomFallback(textbox, formattedText);
+    }
 
     textbox.dispatchEvent(new InputEvent("input", {
       bubbles: true,
@@ -747,13 +783,112 @@ function injectTextIntoReplyBox(textbox, text) {
 }
 
 function typeInReplyBox(content) {
-  const replyBox = document.querySelector('div[contenteditable="true"]');
+  const replyBox = findReplyTextbox();
   if (!replyBox) {
     console.error("[Threads AI] Không tìm thấy ô reply!");
     return false;
   }
 
   return injectTextIntoReplyBox(replyBox, content);
+}
+
+function findReplyTextbox(root = document) {
+  const replyBoxes = Array.from(root.querySelectorAll?.(REPLY_BOX_SELECTOR) ?? []);
+  return replyBoxes.find(isReplyTextbox) || replyBoxes[0] || null;
+}
+
+function isReplyTextbox(textbox) {
+  const placeholder = [
+    textbox?.getAttribute?.("aria-placeholder"),
+    textbox?.getAttribute?.("placeholder"),
+    textbox?.getAttribute?.("aria-label"),
+  ].filter(Boolean).join(" ");
+
+  return placeholder.includes(REPLY_COMPOSER_PLACEHOLDER)
+    || /post your reply|reply to|compose a new post/i.test(placeholder);
+}
+
+function getButtonLabel(button) {
+  return [
+    button?.getAttribute?.("aria-label"),
+    button?.innerText,
+    button?.textContent,
+  ].filter(Boolean).join(" ").trim();
+}
+
+function findReplyComposerRoot(replyBox) {
+  let node = replyBox;
+  for (let i = 0; i < 8 && node?.parentElement; i += 1) {
+    node = node.parentElement;
+    if (Array.from(node.querySelectorAll?.("button") ?? []).some(isReplySubmitButton)) {
+      return node;
+    }
+  }
+  return replyBox?.closest?.('[role="dialog"], [role="none"]') || document;
+}
+
+function findExpandComposerButton(replyBox) {
+  const root = findReplyComposerRoot(replyBox);
+  const buttons = Array.from(root.querySelectorAll?.('button, [role="button"]') ?? []);
+  return buttons.find(button => /expand composer|expand/i.test(getButtonLabel(button))) || null;
+}
+
+function isReplySubmitButton(button) {
+  const label = getButtonLabel(button);
+  return /^reply$/i.test(label) || /\bpost reply\b/i.test(label);
+}
+
+function findReplySubmitButton(replyBox) {
+  const root = findReplyComposerRoot(replyBox);
+  const scopedButtons = Array.from(root.querySelectorAll?.('button, [role="button"]') ?? []);
+  return scopedButtons.find(isReplySubmitButton)
+    || Array.from(document.querySelectorAll?.('button, [role="button"]') ?? []).find(isReplySubmitButton)
+    || null;
+}
+
+function waitForReplySubmitButton(replyBox, timeoutMs = 1200) {
+  const existing = findReplySubmitButton(replyBox);
+  if (existing) return Promise.resolve(existing);
+
+  return new Promise(resolve => {
+    const timeoutId = setTimeout(() => {
+      observer.disconnect();
+      resolve(findReplySubmitButton(replyBox));
+    }, timeoutMs);
+    const observer = new MutationObserver(() => {
+      const button = findReplySubmitButton(replyBox);
+      if (!button) return;
+      clearTimeout(timeoutId);
+      observer.disconnect();
+      resolve(button);
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+  });
+}
+
+async function postReplyText(content) {
+  const replyBox = findReplyTextbox();
+  if (!replyBox) {
+    return { success: false, error: "No reply box found" };
+  }
+
+  const filled = injectTextIntoReplyBox(replyBox, content);
+  if (!filled) {
+    return { success: false, error: "Reply text is empty or could not be inserted" };
+  }
+
+  findExpandComposerButton(replyBox)?.click?.();
+  const submitButton = await waitForReplySubmitButton(replyBox);
+  if (!submitButton) {
+    return { success: false, error: "Reply button not found" };
+  }
+
+  if (submitButton.disabled || submitButton.getAttribute?.("aria-disabled") === "true") {
+    return { success: false, error: "Reply button is disabled" };
+  }
+
+  submitButton.click?.();
+  return { success: true };
 }
 
 // ─── Inline UI Injection ──────────────────────────────────────────────────────
@@ -1066,7 +1201,7 @@ async function generateAndFill(tone, replyBox, panel, anchorBtn) {
   // Generate comment via background
   let comment;
   try {
-    const response = await chrome.runtime.sendMessage({
+    const response = await sendRuntimeMessage({
       type: "GENERATE_COMMENT",
       tone: tone.key,
       postText: postContext.postText,
@@ -1238,11 +1373,20 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     return false;
   }
   if (msg.type === "INJECT_COMMENT") {
-    const tb = document.querySelector('[role="textbox"][contenteditable="true"]');
+    const tb = findReplyTextbox();
     if (!tb) { sendResponse({ success: false, error: "No reply box found" }); return false; }
     injectTextIntoReplyBox(tb, msg.comment);
     sendResponse({ success: true });
     return false;
+  }
+  if (msg.type === "POST_REPLY") {
+    postReplyText(msg.comment || msg.text || msg.value)
+      .then(sendResponse)
+      .catch(error => sendResponse({
+        success: false,
+        error: error?.message || "Could not post reply",
+      }));
+    return true;
   }
   if (msg.type === "PING") {
     sendResponse({ alive: true, url: location.href });
@@ -1256,6 +1400,9 @@ window.__threadsAI = {
   extractThreadsPostFromDom,
   getActivePostText,
   getActivePostContext,
+  findReplyTextbox,
+  findReplySubmitButton,
+  postReplyText,
   typeInReplyBox,
 };
 console.log("[Threads AI] Content script ready ✦");

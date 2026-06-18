@@ -64,6 +64,14 @@ async function generate(context, request) {
   return response;
 }
 
+async function getModels(context) {
+  let response;
+  await context.handleGetModels(nextResponse => {
+    response = nextResponse;
+  });
+  return response;
+}
+
 async function testGenerateCommentCallsOnlyGenerateEndpoint() {
   const calls = [];
   const { context, storage } = loadBackgroundScript(async (url, options) => {
@@ -128,7 +136,7 @@ async function testGenerateCommentFormatsBackendCommentBeforeReturning() {
     authorUsername: "@mina",
   });
 
-  assert.equal(response.comment, "this is useful, it compounds.\n\nsecond idea?\n\nthird.");
+  assert.equal(response.comment, "this is useful, it compounds.\n\nsecond idea?");
   assert.equal(response.error, undefined);
 }
 
@@ -184,6 +192,84 @@ async function testGenerateCommentForwardsThreadContext() {
     targetUser: "byanshsingh",
     loggedInUser: "charles.nguyenvn",
   });
+}
+
+async function testGetModelsCallsBackendModelsEndpoint() {
+  const calls = [];
+  const { context } = loadBackgroundScript(async (url, options) => {
+    calls.push({ url, options });
+    return {
+      ok: true,
+      json: async () => ({
+        ok: true,
+        defaultModel: "@cf/deepseek-ai/deepseek-r1-distill-qwen-32b",
+        models: [
+          {
+            key: "@cf/deepseek-ai/deepseek-r1-distill-qwen-32b",
+            label: "DeepSeek R1 Distill Qwen 32B",
+            description: "Default reasoning model",
+          },
+          {
+            key: "@cf/meta/llama-3.1-8b-instruct",
+            label: "Llama 3.1 8B Instruct",
+            description: "Fast general replies",
+          },
+        ],
+      }),
+    };
+  });
+
+  const response = await getModels(context);
+
+  assert.deepEqual(JSON.parse(JSON.stringify(response)), {
+    defaultModel: "@cf/deepseek-ai/deepseek-r1-distill-qwen-32b",
+    models: [
+      {
+        key: "@cf/deepseek-ai/deepseek-r1-distill-qwen-32b",
+        label: "DeepSeek R1 Distill Qwen 32B",
+        description: "Default reasoning model",
+      },
+      {
+        key: "@cf/meta/llama-3.1-8b-instruct",
+        label: "Llama 3.1 8B Instruct",
+        description: "Fast general replies",
+      },
+    ],
+  });
+  assert.equal(calls.length, 1);
+  assert.equal(
+    calls[0].url,
+    "https://threads-commenter-extension.fastapicloud.dev/api/models"
+  );
+  assert.equal(calls[0].options.method, "GET");
+}
+
+async function testGenerateCommentForwardsStoredSelectedModel() {
+  const calls = [];
+  const storage = createStorage({
+    selectedModel: "@cf/meta/llama-3.1-8b-instruct",
+  });
+  const { context } = loadBackgroundScript(async (url, options) => {
+    calls.push({ url, options });
+    return {
+      ok: true,
+      json: async () => ({
+        ok: true,
+        comment: "model choice works",
+      }),
+    };
+  }, storage);
+
+  const response = await generate(context, {
+    type: "GENERATE_COMMENT",
+    tone: "friendly",
+    postText: "Small consistent replies compound faster than people expect.",
+    authorName: "Charles",
+    authorUsername: "charles",
+  });
+
+  assert.equal(response.comment, "model choice works");
+  assert.equal(JSON.parse(calls[0].options.body).model, "@cf/meta/llama-3.1-8b-instruct");
 }
 
 async function testConfiguredTonesExposeRequestedToneSet() {
@@ -375,9 +461,11 @@ async function testInvalidPostTextSkipsNetworkCall() {
 
 (async () => {
   await testConfiguredTonesExposeRequestedToneSet();
+  await testGetModelsCallsBackendModelsEndpoint();
   await testGenerateCommentCallsOnlyGenerateEndpoint();
   await testGenerateCommentFormatsBackendCommentBeforeReturning();
   await testGenerateCommentForwardsThreadContext();
+  await testGenerateCommentForwardsStoredSelectedModel();
   await testGenerateCommentReusesDeviceId();
   await testSavePreferencesCallsBackendAndCachesResponse();
   await testGetPreferencesCallsBackendWithDeviceId();

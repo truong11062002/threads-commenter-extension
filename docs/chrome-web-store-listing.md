@@ -19,13 +19,13 @@ What it does:
 - Saves **Your voice** so replies can match your natural style, energy, vocabulary, and boundaries.
 - Saves your **Threads comment strategy** so generated replies follow the angle you want.
 - Offers 12 tone options: Simple, Friendly, Funny, Insightful, Curious, Relatable, Contrarian, Supportive, Expert, Visionary, Analytical, and Meme.
-- Includes 3 strategy templates: **Spark Reply**, **Value Drop**, and **Hot Take**.
+- Includes 3 strategy templates: **Specific Reply**, **Value Drop**, and **Hot Take**.
 - Formats replies to feel more human and mobile-native, with clean spacing between thoughts.
 - Works directly inside the Threads reply composer, so you can stay in flow.
 
 Strategy templates:
 
-- **Spark Reply**: open question hook for pulling real engagement.
+- **Specific Reply**: observation-first reply for specific, natural engagement.
 - **Value Drop**: add value plus a soft CTA to build authority.
 - **Hot Take**: contrarian angle plus credibility to stand out.
 

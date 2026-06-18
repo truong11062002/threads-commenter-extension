@@ -1,8 +1,56 @@
+# macOS
 .DS_Store
-dist/
-*.zip
+
+# Environment and local secrets
 .env
 .env.*
 !.env.example
-threads-ai-commenter/
+
+# Chrome extension build artifacts
+dist/
 extension/
+*.zip
+*.crx
+
+# Dependencies
+node_modules/
+**/node_modules/
+.venv/
+**/.venv/
+venv/
+**/venv/
+
+# Python caches and packaging
+__pycache__/
+**/__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+**/.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+build/
+**/build/
+dist/
+**/dist/
+*.egg-info/
+**/*.egg-info/
+
+# Frontend build caches
+.vite/
+**/.vite/
+.vite-temp/
+**/.vite-temp/
+app/static/
+**/app/static/
+coverage/
+**/coverage/
+
+# Local databases and runtime files
+*.db
+*.sqlite
+*.sqlite3
+
+# Local editor/agent settings
+.claude/settings.local.json
+**/.claude/settings.local.json

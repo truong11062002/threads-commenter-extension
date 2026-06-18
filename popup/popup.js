@@ -11,11 +11,11 @@ const DEFAULT_USER_VOICE = [
 
 const STRATEGY_TEMPLATES = {
   sparkReply: [
-    "Template: Spark Reply",
-    "Open question hook",
-    "Goal: pull more real replies from the author and nearby readers.",
-    "Write a short comment that notices one specific detail, validates the point briefly, then asks one concrete follow-up question.",
-    "Avoid generic praise, fake curiosity, and engagement-bait wording.",
+    "Template: Specific Reply",
+    "Observation-first reply",
+    "Goal: earn attention with a reply that feels specific, useful, and easy to answer without relying on questions.",
+    "Write a short comment that notices one specific detail, adds a grounded reaction or useful angle, and leaves room for replies without asking a question.",
+    "Avoid generic praise, fake curiosity, question hooks, and engagement-bait wording.",
   ].join("\n"),
   valueDrop: [
     "Template: Value Drop",
@@ -36,6 +36,8 @@ const STRATEGY_TEMPLATES = {
 const DEFAULT_VIRAL_STRATEGY = STRATEGY_TEMPLATES.sparkReply;
 
 const el = {
+  modelSelect: document.getElementById("modelSelect"),
+  modelStatus: document.getElementById("modelStatus"),
   userVoiceInput: document.getElementById("userVoiceInput"),
   saveVoiceBtn: document.getElementById("saveVoiceBtn"),
   voiceStatus: document.getElementById("voiceStatus"),
@@ -49,6 +51,13 @@ const el = {
 };
 
 let initPromise = null;
+let modelPickerState = {
+  models: [],
+  defaultOption: {
+    label: "Default - backend default",
+    description: "Uses the backend default model",
+  },
+};
 
 async function init() {
   if (initPromise) return initPromise;
@@ -61,10 +70,12 @@ async function initializePreferences() {
     userVoice,
     viralStrategy,
     useViralStrategy,
+    selectedModel,
   } = await chrome.storage.local.get([
     "userVoice",
     "viralStrategy",
     "useViralStrategy",
+    "selectedModel",
   ]);
 
   applyPreferences({
@@ -73,6 +84,7 @@ async function initializePreferences() {
     useViralStrategy,
   });
 
+  await initializeModelPicker(selectedModel);
   await loadBackendPreferences();
 }
 
@@ -115,9 +127,102 @@ el.saveVoiceBtn.addEventListener("click", async () => {
 });
 
 el.viralStrategyInput.addEventListener("change", saveViralStrategy);
+el.modelSelect.addEventListener("change", saveSelectedModel);
 el.sparkReplyTemplateBtn.addEventListener("click", () => applyStrategyTemplate("sparkReply"));
 el.valueDropTemplateBtn.addEventListener("click", () => applyStrategyTemplate("valueDrop"));
 el.hotTakeTemplateBtn.addEventListener("click", () => applyStrategyTemplate("hotTake"));
+
+async function initializeModelPicker(selectedModel) {
+  renderModelOptions({
+    defaultModel: "",
+    models: [],
+  }, selectedModel);
+
+  try {
+    const response = await chrome.runtime.sendMessage({ type: "GET_MODELS" });
+    if (!response || response.error) {
+      throw new Error(response?.error || "Could not load models.");
+    }
+
+    const renderedModel = renderModelOptions(response, selectedModel);
+    if (selectedModel && renderedModel !== selectedModel) {
+      await chrome.storage.local.set({ selectedModel: "" });
+    }
+    hideError();
+  } catch (error) {
+    el.modelStatus.textContent = error?.message || "Could not load models.";
+    showError(el.modelStatus.textContent);
+  }
+}
+
+function renderModelOptions(response = {}, selectedModel = "") {
+  const models = normalizeModels(response.models);
+  const defaultModel = cleanString(response.defaultModel);
+  const defaultOption = getDefaultModelOption(models, defaultModel);
+  const validSelectedModel = models.some(model => model.key === selectedModel)
+    ? selectedModel
+    : "";
+  modelPickerState = { models, defaultOption };
+
+  el.modelSelect.innerHTML = [
+    optionHtml("", defaultOption.label, defaultOption.description),
+    ...models.map(model => optionHtml(model.key, model.label, model.description)),
+  ].join("");
+  el.modelSelect.value = validSelectedModel;
+  updateModelStatus(validSelectedModel, models, defaultOption);
+  return validSelectedModel;
+}
+
+function normalizeModels(models) {
+  if (!Array.isArray(models)) return [];
+
+  return models
+    .map(model => ({
+      key: cleanString(model?.key),
+      label: cleanString(model?.label),
+      description: cleanString(model?.description),
+    }))
+    .filter(model => model.key && model.label);
+}
+
+function getDefaultModelOption(models, defaultModel) {
+  const defaultModelOption = models.find(model => model.key === defaultModel);
+  const defaultLabel = defaultModelOption?.label || defaultModel || "backend default";
+
+  return {
+    label: `Default - ${defaultLabel}`,
+    description: defaultModelOption?.description || "Uses the backend default model",
+  };
+}
+
+async function saveSelectedModel() {
+  const selectedModel = cleanString(el.modelSelect.value);
+  await chrome.storage.local.set({ selectedModel });
+  updateModelStatus(selectedModel);
+}
+
+function updateModelStatus(
+  selectedModel,
+  models = modelPickerState.models,
+  defaultOption = modelPickerState.defaultOption
+) {
+  const selectedOption = models.find(model => model.key === selectedModel);
+  if (selectedOption) {
+    el.modelStatus.textContent = `Using ${selectedOption.label}`;
+    el.modelStatus.classList.add("saved");
+    return;
+  }
+
+  const defaultLabel = defaultOption?.label?.replace(/^Default - /, "") || "backend default";
+  el.modelStatus.textContent = `Using ${defaultLabel}`;
+  el.modelStatus.classList.toggle("saved", false);
+}
+
+function optionHtml(value, label, description = "") {
+  const safeDescription = escapeHtml(description);
+  const title = safeDescription ? ` title="${safeDescription}"` : "";
+  return `<option value="${escapeHtml(value)}"${title}>${escapeHtml(label)}</option>`;
+}
 
 async function applyStrategyTemplate(templateKey) {
   el.viralStrategyInput.value = STRATEGY_TEMPLATES[templateKey] || DEFAULT_VIRAL_STRATEGY;
@@ -213,6 +318,14 @@ function setTemplateButtonsDisabled(disabled) {
 
 function cleanString(value) {
   return typeof value === "string" ? value.trim() : "";
+}
+
+function escapeHtml(value) {
+  return cleanString(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
 }
 
 function showError(msg) {

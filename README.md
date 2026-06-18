@@ -13,6 +13,7 @@ Building in public works best when you show up consistently. The hard part is no
 ## What You Can Do
 
 - **Reply in your own voice**: save your writing style so comments sound more like you.
+- **Choose the AI model**: load the available model list from the backend and pick the model from the extension popup.
 - **Optimize for real conversations**: use a Threads comment strategy that invites meaningful replies without spam or engagement bait.
 - **Grow by milestone**: apply X-style engagement signals for `0 -> 300`, `300 -> 1000`, and `1000 -> 5000` follower stages.
 - **Build personal brand**: replies aim to be useful, positive, grounded, and consistent with your values and niche.
@@ -68,7 +69,7 @@ Every generated reply is also guided to support personal branding: useful to the
 | Milestone | Comment Strategy |
 |-----------|------------------|
 | `0 -> 300` | Earn trust and profile clicks with relatable observations, tiny personal experiences, and clear niche identity |
-| `300 -> 1000` | Build recognizable angles with sharper observations, useful disagreement, or concrete follow-ups |
+| `300 -> 1000` | Build recognizable angles with sharper observations, useful disagreement, or concrete reply angles |
 | `1000 -> 5000` | Become a concise signal source with pattern recognition, simple frameworks, or lived lessons |
 
 ## Installation
@@ -114,6 +115,7 @@ The default voice uses positive energy, celebrates other people's wins, shares r
 ## API
 
 - Base URL: `https://threads-commenter-extension.fastapicloud.dev`
+- Models: `GET /api/models`
 - Preferences: `GET /api/preferences`, `PUT /api/preferences`
 - Generation: `POST /api/comments/generate`
 

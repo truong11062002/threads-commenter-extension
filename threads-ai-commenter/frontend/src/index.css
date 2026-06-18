@@ -1,0 +1,372 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: #0a0a0a;
+  color: #fafafa;
+  min-height: 100vh;
+}
+
+#root {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.container {
+  width: 100%;
+  max-width: 400px;
+  padding: 2rem;
+}
+
+.logo {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.logo h1 {
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+.logo p {
+  color: #888;
+  font-size: 0.875rem;
+  margin-top: 0.5rem;
+}
+
+.card {
+  background: #1a1a1a;
+  border: 1px solid #333;
+  border-radius: 12px;
+  padding: 1.5rem;
+}
+
+.tabs {
+  display: flex;
+  margin-bottom: 1.5rem;
+  border-bottom: 1px solid #333;
+}
+
+.tab {
+  flex: 1;
+  padding: 0.75rem;
+  text-align: center;
+  cursor: pointer;
+  color: #888;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  font-size: 0.875rem;
+  transition: all 0.2s;
+}
+
+.tab.active {
+  color: #fff;
+  border-bottom-color: #fff;
+}
+
+.form-group {
+  margin-bottom: 1rem;
+}
+
+.form-group label {
+  display: block;
+  font-size: 0.875rem;
+  color: #ccc;
+  margin-bottom: 0.375rem;
+}
+
+.form-group input {
+  width: 100%;
+  padding: 0.625rem 0.75rem;
+  background: #0a0a0a;
+  border: 1px solid #444;
+  border-radius: 8px;
+  color: #fff;
+  font-size: 0.875rem;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.form-group input:focus {
+  border-color: #888;
+}
+
+.btn {
+  width: 100%;
+  padding: 0.75rem;
+  background: #fff;
+  color: #000;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  margin-top: 0.5rem;
+  transition: opacity 0.2s;
+}
+
+.btn:hover {
+  opacity: 0.9;
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.message {
+  margin-top: 1rem;
+  padding: 0.75rem;
+  border-radius: 8px;
+  font-size: 0.8rem;
+}
+
+.message.success {
+  background: #052e16;
+  border: 1px solid #166534;
+  color: #4ade80;
+}
+
+.message.error {
+  background: #2a0a0a;
+  border: 1px solid #7f1d1d;
+  color: #f87171;
+}
+
+/* User Info */
+.user-info {
+  text-align: center;
+  margin-bottom: 1.5rem;
+}
+
+.avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: #333;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
+.name {
+  font-weight: 600;
+  font-size: 1rem;
+}
+
+.email {
+  color: #888;
+  font-size: 0.8rem;
+}
+
+/* Credits Display (Dashboard) */
+.credits-display {
+  text-align: center;
+  margin-bottom: 1.5rem;
+  padding: 1.25rem;
+  background: #0a0a0a;
+  border: 1px solid #333;
+  border-radius: 10px;
+}
+
+.credits-number {
+  font-size: 3rem;
+  font-weight: 700;
+  color: #4ade80;
+  line-height: 1;
+}
+
+.credits-label {
+  font-size: 0.8rem;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-top: 0.375rem;
+}
+
+/* Usage Card */
+.usage-card {
+  background: #0a0a0a;
+  border: 1px solid #333;
+  border-radius: 8px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+}
+
+.usage-card h3 {
+  font-size: 0.8rem;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.75rem;
+}
+
+.usage-bar {
+  height: 8px;
+  background: #333;
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 0.5rem;
+}
+
+.usage-bar-fill {
+  height: 100%;
+  background: #4ade80;
+  border-radius: 4px;
+  transition: width 0.3s;
+}
+
+.usage-bar-fill.warning {
+  background: #facc15;
+}
+
+.usage-bar-fill.danger {
+  background: #f87171;
+}
+
+.usage-stats {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.8rem;
+  color: #aaa;
+}
+
+.usage-stats .number {
+  font-weight: 600;
+  color: #fff;
+}
+
+.reset-info {
+  margin-top: 0.5rem;
+  font-size: 0.7rem;
+  color: #666;
+}
+
+/* Auth Buttons */
+.btn-google {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.625rem;
+  background: #1a1a1a;
+  border: 1px solid #444;
+  color: #fff;
+  margin-top: 0;
+}
+
+.btn-google:hover {
+  background: #252525;
+  opacity: 1;
+}
+
+.divider {
+  display: flex;
+  align-items: center;
+  margin: 1.25rem 0;
+}
+
+.divider::before,
+.divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: #333;
+}
+
+.divider span {
+  padding: 0 0.75rem;
+  color: #666;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+}
+
+.btn-logout {
+  background: transparent;
+  border: 1px solid #444;
+  color: #ccc;
+  margin-top: 1rem;
+}
+
+.btn-logout:hover {
+  border-color: #f87171;
+  color: #f87171;
+}
+
+/* Auth Quota Display (shown after login/signup) */
+.auth-quota {
+  margin-top: 1rem;
+  padding: 1rem;
+  background: #052e16;
+  border: 1px solid #166534;
+  border-radius: 10px;
+}
+
+.auth-quota-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.auth-quota-badge {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: #4ade80;
+  color: #052e16;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.125rem;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.auth-quota-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+
+.auth-quota-title {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #4ade80;
+}
+
+.auth-quota-detail {
+  font-size: 0.75rem;
+  color: #86efac;
+}
+
+.auth-quota-bar {
+  height: 6px;
+  background: #14532d;
+  border-radius: 3px;
+  overflow: hidden;
+  margin-bottom: 0.5rem;
+}
+
+.auth-quota-bar-fill {
+  height: 100%;
+  background: #4ade80;
+  border-radius: 3px;
+  transition: width 0.3s;
+}
+
+.auth-quota-footer {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.7rem;
+  color: #86efac;
+}

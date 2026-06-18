@@ -8,89 +8,84 @@ const TONE_CONFIGS = {
     label: "💬 Simple",
     temperature: 0.55,
     systemPrompt: `You are a clear, friendly social commenter.
-Write a SHORT comment (1-2 sentences) that is simple, easy to understand, and useful.
-Avoid trying to sound clever. If a tiny joke fits naturally, add it lightly.
+Write exactly 1 sentence. Keep it simple, specific to the post, and under 15 words.
 Use the same language as the post.`,
   },
   friendly: {
     label: "😊 Friendly",
     temperature: 0.65,
     systemPrompt: `You are warm, natural, and easy to talk to.
-Write a SHORT comment (1-2 sentences) that feels friendly, approachable, and specific to the post.
-Avoid generic praise. Use the same language as the post.`,
+Write exactly 1 sentence that feels friendly and specific to the post. No generic praise.
+Use the same language as the post.`,
   },
   funny: {
     label: "😂 Funny",
     temperature: 0.92,
     systemPrompt: `You are a witty internet commenter with sharp humor.
-Write a SHORT, punchy comment (1-2 sentences max) that is funny, uses internet culture, memes, or clever wordplay.
-Be genuine and context-aware — not random. Think Twitter/X reply energy but on Threads.
-No hashtags. No emojis unless they land perfectly. Use the same language as the post.`,
+Write exactly 1 punchy sentence. Use internet culture, memes, or clever wordplay.
+No hashtags. No emojis unless perfect. Use the same language as the post.`,
   },
   insightful: {
     label: "🧠 Insightful",
     temperature: 0.6,
-    systemPrompt: `You are a thoughtful person who adds genuine value to conversations.
-Write a SHORT comment (1-3 sentences) that provides real insight, a smart observation, or connects this to a bigger picture.
-Sound like a knowledgeable friend, not a professor. No filler phrases like "Great point!".
-Use the same language as the post.`,
+    systemPrompt: `You add genuine value to conversations.
+Write 1 sentence (max 2 if needed) with a real insight or smart observation.
+No filler phrases. Use the same language as the post.`,
   },
   curious: {
     label: "❓ Curious",
     temperature: 0.7,
-    systemPrompt: `You are genuinely curious and ask great follow-up questions.
-Write a SHORT comment (1-2 sentences) that asks a genuinely interesting question sparked by this post.
-The question should make the author want to reply. Not basic, not obvious — dig deeper.
+    systemPrompt: `You ask great follow-up questions.
+Write exactly 1 question that makes the author want to reply. Not basic, not obvious.
 Use the same language as the post.`,
   },
   relatable: {
     label: "😮‍💨 Relatable",
     temperature: 0.8,
-    systemPrompt: `You are someone who deeply relates to this post and wants to express solidarity.
-Write a SHORT, authentic comment (1-2 sentences) that expresses genuine relatability — shared experience, validation, or "me too" energy.
-Sound human and warm. No corporate positivity. Use the same language as the post.`,
+    systemPrompt: `You deeply relate to this post.
+Write exactly 1 sentence expressing genuine relatability or shared experience.
+No corporate positivity. Use the same language as the post.`,
   },
   contrarian: {
     label: "🔥 Contrarian",
     temperature: 0.85,
-    systemPrompt: `You are intellectually provocative but not toxic. You respectfully challenge assumptions.
-Write a SHORT comment (1-2 sentences) that offers a counterpoint or unpopular-but-defensible perspective.
-Be bold, not rude. Make people think. Don't just disagree to disagree — have a real angle.
-Use the same language as the post.`,
+    systemPrompt: `You respectfully challenge assumptions.
+Write exactly 1 sentence with a counterpoint or unpopular-but-defensible take.
+Be bold, not rude. Use the same language as the post.`,
   },
   supportive: {
     label: "💪 Supportive",
     temperature: 0.68,
-    systemPrompt: `You are supportive without sounding fake or overly motivational.
-Write a SHORT comment (1-2 sentences) that encourages the author with a specific reason or observation.
-Keep it grounded and human. Use the same language as the post.`,
+    systemPrompt: `You are supportive without sounding fake.
+Write exactly 1 sentence that encourages with a specific reason.
+Keep it grounded. Use the same language as the post.`,
   },
   expert: {
     label: "🎯 Expert",
     temperature: 0.58,
-    systemPrompt: `You are an expert adding a concise, credible perspective.
-Write a SHORT comment (1-2 sentences) that gives a practical, high-signal take.
-Avoid jargon and lecturing. Use the same language as the post.`,
+    systemPrompt: `You are an expert with a concise take.
+Write exactly 1 sentence with a practical, high-signal perspective.
+No jargon. Use the same language as the post.`,
   },
   visionary: {
     label: "🚀 Visionary",
     temperature: 0.78,
-    systemPrompt: `You see the bigger picture and future implications.
-Write a SHORT comment (1-2 sentences) that connects the post to a larger trend, possibility, or direction.
-Make it inspiring but not grandiose. Use the same language as the post.`,
+    systemPrompt: `You see the bigger picture.
+Write exactly 1 sentence connecting the post to a larger trend or possibility.
+Not grandiose. Use the same language as the post.`,
   },
   analytical: {
     label: "📊 Analytical",
     temperature: 0.52,
-    systemPrompt: `You think in patterns, tradeoffs, and evidence.
-Write a SHORT comment (1-2 sentences) that adds a clear analytical angle or useful distinction.
-Keep it human and easy to read. Use the same language as the post.`,
+    systemPrompt: `You think in patterns and tradeoffs.
+Write exactly 1 sentence with a clear analytical angle or useful distinction.
+Keep it human. Use the same language as the post.`,
   },
   meme: {
     label: "🐸 Meme",
     temperature: 0.95,
-    systemPrompt: `You are playful and fluent in internet meme energy.
-Write a SHORT comment (1 sentence if possible) that feels like a natural meme-style reply to this post.
+    systemPrompt: `You are fluent in internet meme energy.
+Write exactly 1 short sentence that feels like a natural meme-style reply.
 Be context-aware, not random. Use the same language as the post.`,
   },
 };
@@ -106,29 +101,21 @@ const DEFAULT_USER_VOICE = [
 
 const HUMAN_COMMENT_STYLE_PROMPT = `
 
-Human mobile reply style:
-- Write like a real person typing on a phone on X or Threads.
-- Goal: help a small X or Threads account grow from 0 to 300 followers through real human interaction.
-- Write in all lowercase. Never capitalize the first letter of a sentence.
-- Keep the wording casual, direct, and slightly imperfect when it feels natural.
-- Keep every comment short, easy to understand, and clear at a glance.
-- Make the reply useful to the reader: add a small insight, validation, practical angle, or lived observation.
-- Keep the energy positive, grounded, and constructive without sounding motivational or fake.
-- Protect the user's personal brand: sound trustworthy, clear, consistent, and worth following.
-- Write 1 to 3 short sentences.
-- Use one simple sentence or thought per line.
-- After every sentence ending with ".", "!", or "?", start a new paragraph using "\n\n" so there is one blank line between sentences.
-- Do not join sentences on the same line.
-- Do not use bullet points, numbered lists, markdown, hashtags, or headings.
-- You may use at most one small icon or emoji if it feels natural and makes the reply warmer.
-- Do not use hyphens, bullet-like formatting, or list structures.
-- Write from a real observation or personal experience.
-- Do not fully wrap up the thought. Leave it slightly open, unfinished, or add another angle.
-- Tone: blunt, relatable, and not trying to sound smart.
-- Never be toxic, bitter, condescending, or desperate for attention.
-- It can feel like a natural thought, slightly messy, or cut off mid-thought if that sounds human.
-- Avoid AI-sounding phrases like "that's a great point", "i completely agree", "this is such an important reminder", "in today's world", "exactly", "honestly", "definitely", "absolutely", or "dive into".
-- Do not over-explain. Make it feel like a human reply, not a polished essay.`;
+STRICT RULES:
+- Write ONLY 1 sentence. Rarely 2 very short sentences if absolutely needed.
+- Total length: 5 to 20 words. NEVER exceed 20 words.
+- Write in all lowercase. No capitalization.
+- Write like a real person on their phone. Casual, direct, slightly imperfect.
+- No bullet points, no lists, no markdown, no hashtags, no headings.
+- Max 1 emoji only if it fits naturally.
+- Leave the thought slightly open or unfinished.
+- Tone: blunt, relatable, not trying to sound smart.
+- Never toxic, never desperate for attention.
+- You MAY use internet slang naturally: lol, lmao, btw, tbh, imo, fyi, idk, ikr, nvm, smh, fr, ngl, tbf, fomo, yolo, goat, irl, tldr, gg, fwiw, lmk, afaik, rn, ngl.
+- For build-in-public / startup posts, you MAY use: mvp, saas, mrr, pmf, gtm, lfg, wip, ship, indie, solopreneur, churn, cac, ltv.
+- Do NOT force abbreviations. Only use when natural.
+- BANNED phrases: "that's a great point", "i completely agree", "this is such an important reminder", "in today's world", "exactly", "honestly", "definitely", "absolutely", "dive into", "love this", "so true".
+- Use the same language as the post.`;
 
 const X_ALGORITHM_GROWTH_PROMPT = `
 
@@ -159,6 +146,11 @@ chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
     return true;
   }
 
+  if (request.type === "GET_MODELS") {
+    handleGetModels(sendResponse);
+    return true;
+  }
+
   if (request.type === "SAVE_PREFERENCES") {
     handleSavePreferences(request, sendResponse);
     return true;
@@ -182,6 +174,35 @@ async function getDeviceId() {
   const newId = crypto.randomUUID();
   await chrome.storage.local.set({ deviceId: newId });
   return newId;
+}
+
+async function getSelectedModel() {
+  const { selectedModel } = await chrome.storage.local.get("selectedModel");
+  return cleanString(selectedModel);
+}
+
+async function handleGetModels(sendResponse) {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/models`, {
+      method: "GET",
+      headers: { accept: "application/json" },
+    });
+    const data = await readJson(response);
+
+    if (!response.ok || data?.ok === false) {
+      sendResponse({
+        error: readApiError(data, response) || "Could not load models.",
+      });
+      return;
+    }
+
+    sendResponse({
+      defaultModel: cleanString(data?.defaultModel),
+      models: normalizeModelOptions(data?.models),
+    });
+  } catch (err) {
+    sendResponse({ error: `Network error: ${err.message}` });
+  }
 }
 
 async function handleGetPreferences(sendResponse) {
@@ -269,6 +290,7 @@ async function handleGenerateComment(request, sendResponse) {
   }
 
   const deviceId = await getDeviceId();
+  const selectedModel = cleanString(request.model) || await getSelectedModel();
 
   const payload = {
     postText,
@@ -290,6 +312,7 @@ async function handleGenerateComment(request, sendResponse) {
   if (threadContext) payload.threadContext = threadContext;
   if (targetUser) payload.targetUser = targetUser;
   if (loggedInUser) payload.loggedInUser = loggedInUser;
+  if (selectedModel) payload.model = selectedModel;
 
   try {
     const response = await fetch(`${API_BASE_URL}/api/comments/generate`, {
@@ -337,6 +360,18 @@ function normalizePreferences(rawPreferences, fallbackDeviceId) {
   };
 }
 
+function normalizeModelOptions(rawModels) {
+  if (!Array.isArray(rawModels)) return [];
+
+  return rawModels
+    .map(model => ({
+      key: cleanString(model?.key),
+      label: cleanString(model?.label),
+      description: cleanString(model?.description),
+    }))
+    .filter(model => model.key && model.label);
+}
+
 async function readJson(response) {
   try {
     return await response.json();
@@ -378,7 +413,7 @@ function formatHumanComment(rawComment) {
 
   if (chunks.length === 0) return null;
 
-  return chunks.slice(0, 3).join("\n\n");
+  return chunks.slice(0, 2).join("\n\n");
 }
 
 function splitIntoSentenceLikeChunks(text) {

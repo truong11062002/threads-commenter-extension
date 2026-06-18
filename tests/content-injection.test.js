@@ -161,20 +161,75 @@ const ok = context.injectTextIntoReplyBox(
 assert.equal(ok, true);
 assert.equal(textbox.focusCount, 1);
 assert.equal(textbox.clickCount, 1);
-assert.equal(textbox.clearCount, 1);
-assert.deepEqual(commands, []);
-assert.deepEqual(textbox.appendedNodes, [
-  { nodeType: 3, textContent: "wow, that's an awesome start!" },
-  { nodeType: 1, tagName: "BR" },
-  { nodeType: 3, textContent: "" },
-  { nodeType: 1, tagName: "BR" },
-  { nodeType: 3, textContent: "building in public is such a brave way to grow." },
+assert.equal(textbox.clearCount, 0);
+assert.deepEqual(commands, [
+  { command: "selectAll", value: undefined },
+  { command: "delete", value: undefined },
+  {
+    command: "insertText",
+    value: "wow, that's an awesome start!\n\nbuilding in public is such a brave way to grow.",
+  },
 ]);
+assert.deepEqual(textbox.appendedNodes, []);
 assert.deepEqual(textbox.events, ["input", "change"]);
 assert.equal(selection.removed, true);
 assert.equal(selection.addedRange, range);
 assert.equal(range.selectedNode, textbox);
 assert.equal(range.collapsedToEnd, true);
+
+commands.length = 0;
+const lexicalDispatches = [];
+const insertTextCommand = { type: "INSERT_TEXT_COMMAND" };
+const lexicalTextbox = {
+  focusCount: 0,
+  clickCount: 0,
+  clearCount: 0,
+  events: [],
+  appendedNodes: [],
+  __lexicalEditor: {
+    _commands: new Map([[insertTextCommand, []]]),
+    dispatchCommand(command, payload) {
+      lexicalDispatches.push({ type: command.type, payload });
+      return true;
+    },
+  },
+  set innerHTML(value) {
+    assert.equal(value, "");
+    this.clearCount += 1;
+    this.appendedNodes.length = 0;
+  },
+  focus() {
+    this.focusCount += 1;
+  },
+  click() {
+    this.clickCount += 1;
+  },
+  appendChild(node) {
+    this.appendedNodes.push(node);
+    return node;
+  },
+  dispatchEvent(event) {
+    this.events.push(event.type);
+    return true;
+  },
+};
+
+assert.equal(context.injectTextIntoReplyBox(
+  lexicalTextbox,
+  "this should update lexical state before enter posts"
+), true);
+assert.deepEqual(commands, [
+  { command: "selectAll", value: undefined },
+  { command: "delete", value: undefined },
+  {
+    command: "insertText",
+    value: "this should update lexical state before enter posts",
+  },
+]);
+assert.deepEqual(lexicalDispatches, []);
+assert.equal(lexicalTextbox.clearCount, 0);
+assert.deepEqual(lexicalTextbox.appendedNodes, []);
+assert.deepEqual(lexicalTextbox.events, ["input", "change"]);
 
 const secondTextbox = {
   focusCount: 0,
@@ -208,18 +263,109 @@ const formatted = context.formatHumanComment(
 );
 assert.equal(formatted, "this is useful, it compounds.\n\nsecond idea?\n\nthird.");
 
+commands.length = 0;
+
 assert.equal(context.injectTextIntoReplyBox(
   secondTextbox,
   "- That's a great point! Honestly this is useful - it compounds. Second idea? Third. Fourth."
 ), true);
-assert.deepEqual(secondTextbox.appendedNodes, [
-  { nodeType: 3, textContent: "this is useful, it compounds." },
-  { nodeType: 1, tagName: "BR" },
-  { nodeType: 3, textContent: "" },
-  { nodeType: 1, tagName: "BR" },
-  { nodeType: 3, textContent: "second idea?" },
-  { nodeType: 1, tagName: "BR" },
-  { nodeType: 3, textContent: "" },
-  { nodeType: 1, tagName: "BR" },
-  { nodeType: 3, textContent: "third." },
+assert.deepEqual(commands, [
+  { command: "selectAll", value: undefined },
+  { command: "delete", value: undefined },
+  {
+    command: "insertText",
+    value: "this is useful, it compounds.\n\nsecond idea?\n\nthird.",
+  },
 ]);
+assert.deepEqual(secondTextbox.appendedNodes, []);
+
+function makeButton(label) {
+  return {
+    label,
+    clickCount: 0,
+    disabled: false,
+    getAttribute(name) {
+      return name === "aria-label" ? this.label : null;
+    },
+    click() {
+      this.clickCount += 1;
+    },
+  };
+}
+
+function makeComposerTextbox(attrs = {}) {
+  const expandButton = makeButton("Expand composer");
+  const submitButton = makeButton("Reply");
+  const composer = {
+    parentElement: null,
+    querySelectorAll(selector) {
+      return selector === "button" || selector === 'button, [role="button"]'
+        ? [expandButton, submitButton]
+        : [];
+    },
+  };
+  const textbox = {
+    focusCount: 0,
+    clickCount: 0,
+    clearCount: 0,
+    events: [],
+    appendedNodes: [],
+    parentElement: composer,
+    getAttribute(name) {
+      return attrs[name] ?? null;
+    },
+    closest() {
+      return composer;
+    },
+    set innerHTML(value) {
+      assert.equal(value, "");
+      this.clearCount += 1;
+      this.appendedNodes.length = 0;
+    },
+    focus() {
+      this.focusCount += 1;
+    },
+    click() {
+      this.clickCount += 1;
+    },
+    appendChild(node) {
+      this.appendedNodes.push(node);
+      return node;
+    },
+    dispatchEvent(event) {
+      this.events.push(event.type);
+      return true;
+    },
+  };
+  return { textbox, expandButton, submitButton };
+}
+
+(async () => {
+  const genericComposer = makeComposerTextbox({ "aria-placeholder": "Search" });
+  const replyComposer = makeComposerTextbox({
+    "aria-placeholder": "Empty text field. Type to compose a new post.",
+  });
+  context.document.querySelectorAll = selector => (
+    selector === '[role="textbox"][contenteditable="true"]'
+      ? [genericComposer.textbox, replyComposer.textbox]
+      : []
+  );
+
+  assert.equal(context.findReplyTextbox(), replyComposer.textbox);
+  commands.length = 0;
+
+  const result = await context.postReplyText("Thanks for sharing this");
+  assert.equal(result.success, true);
+  assert.equal(result.error, undefined);
+  assert.equal(replyComposer.textbox.focusCount, 1);
+  assert.equal(replyComposer.expandButton.clickCount, 1);
+  assert.equal(replyComposer.submitButton.clickCount, 1);
+  assert.deepEqual(commands, [
+    { command: "selectAll", value: undefined },
+    { command: "delete", value: undefined },
+    { command: "insertText", value: "thanks for sharing this" },
+  ]);
+})().catch(error => {
+  console.error(error);
+  process.exitCode = 1;
+});

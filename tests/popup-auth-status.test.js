@@ -157,7 +157,10 @@ async function testPopupLoadsBackendPreferencesWhenAvailable() {
 
   await context.init();
 
-  assert.deepEqual(JSON.parse(JSON.stringify(messages)), [{ type: "GET_PREFERENCES" }]);
+  assert.deepEqual(JSON.parse(JSON.stringify(messages)), [
+    { type: "GET_MODELS" },
+    { type: "GET_PREFERENCES" },
+  ]);
   assert.equal(elements.userVoiceInput.value, "backend voice");
   assert.equal(elements.viralStrategyInput.value, "backend strategy");
   assert.equal(elements.useViralStrategyToggle, undefined);
@@ -165,6 +168,104 @@ async function testPopupLoadsBackendPreferencesWhenAvailable() {
   assert.equal(storage.data.userVoice, "backend voice");
   assert.equal(storage.data.viralStrategy, "backend strategy");
   assert.equal(storage.data.useViralStrategy, true);
+}
+
+async function testPopupLoadsModelsAndRestoresSavedSelection() {
+  const storage = createStorage({
+    selectedModel: "@cf/meta/llama-3.1-8b-instruct",
+  });
+  const messages = [];
+  const { context, elements } = loadPopupScript(storage, null, async message => {
+    messages.push(message);
+    if (message.type === "GET_MODELS") {
+      return {
+        defaultModel: "@cf/deepseek-ai/deepseek-r1-distill-qwen-32b",
+        models: [
+          {
+            key: "@cf/deepseek-ai/deepseek-r1-distill-qwen-32b",
+            label: "DeepSeek R1 Distill Qwen 32B",
+            description: "Default reasoning model",
+          },
+          {
+            key: "@cf/meta/llama-3.1-8b-instruct",
+            label: "Llama 3.1 8B Instruct",
+            description: "Fast general replies",
+          },
+        ],
+      };
+    }
+    if (message.type === "GET_PREFERENCES") return null;
+    return null;
+  });
+
+  await context.init();
+
+  assert.deepEqual(JSON.parse(JSON.stringify(messages)), [
+    { type: "GET_MODELS" },
+    { type: "GET_PREFERENCES" },
+  ]);
+  assert.equal(elements.modelSelect.value, "@cf/meta/llama-3.1-8b-instruct");
+  assert.match(elements.modelSelect.innerHTML, /Default - DeepSeek R1 Distill Qwen 32B/);
+  assert.match(elements.modelSelect.innerHTML, /Llama 3.1 8B Instruct/);
+  assert.equal(elements.modelStatus.textContent, "Using Llama 3.1 8B Instruct");
+}
+
+async function testPopupSavesSelectedModelLocally() {
+  const storage = createStorage();
+  const { context, elements } = loadPopupScript(storage, null, async message => {
+    if (message.type === "GET_MODELS") {
+      return {
+        defaultModel: "@cf/deepseek-ai/deepseek-r1-distill-qwen-32b",
+        models: [
+          {
+            key: "@cf/deepseek-ai/deepseek-r1-distill-qwen-32b",
+            label: "DeepSeek R1 Distill Qwen 32B",
+          },
+          {
+            key: "@cf/meta/llama-3.1-8b-instruct",
+            label: "Llama 3.1 8B Instruct",
+          },
+        ],
+      };
+    }
+    if (message.type === "GET_PREFERENCES") return null;
+    return null;
+  });
+
+  await context.init();
+  elements.modelSelect.value = "@cf/meta/llama-3.1-8b-instruct";
+
+  await elements.modelSelect.listeners.change();
+
+  assert.equal(storage.data.selectedModel, "@cf/meta/llama-3.1-8b-instruct");
+  assert.equal(elements.modelStatus.textContent, "Using Llama 3.1 8B Instruct");
+}
+
+async function testPopupClearsSavedModelWhenBackendRemovesIt() {
+  const storage = createStorage({
+    selectedModel: "@cf/removed/model",
+  });
+  const { context, elements } = loadPopupScript(storage, null, async message => {
+    if (message.type === "GET_MODELS") {
+      return {
+        defaultModel: "@cf/deepseek-ai/deepseek-r1-distill-qwen-32b",
+        models: [
+          {
+            key: "@cf/deepseek-ai/deepseek-r1-distill-qwen-32b",
+            label: "DeepSeek R1 Distill Qwen 32B",
+          },
+        ],
+      };
+    }
+    if (message.type === "GET_PREFERENCES") return null;
+    return null;
+  });
+
+  await context.init();
+
+  assert.equal(elements.modelSelect.value, "");
+  assert.equal(storage.data.selectedModel, "");
+  assert.equal(elements.modelStatus.textContent, "Using DeepSeek R1 Distill Qwen 32B");
 }
 
 async function testSaveVoiceSendsPreferencesToBackground() {
@@ -258,8 +359,9 @@ async function testTemplateButtonAppliesStrategyAndSaves() {
 
   await elements.sparkReplyTemplateBtn.listeners.click();
 
-  assert.match(elements.viralStrategyInput.value, /Template: Spark Reply/);
-  assert.match(elements.viralStrategyInput.value, /Open question hook/);
+  assert.match(elements.viralStrategyInput.value, /Template: Specific Reply/);
+  assert.match(elements.viralStrategyInput.value, /Observation-first reply/);
+  assert.doesNotMatch(elements.viralStrategyInput.value, /follow-up question/i);
   assert.deepEqual(JSON.parse(JSON.stringify(messages.at(-1))), {
     type: "SAVE_PREFERENCES",
     userVoice: "warm voice",
@@ -273,6 +375,9 @@ async function testTemplateButtonAppliesStrategyAndSaves() {
   await testPopupInitializesWithoutAuthGate();
   await testPopupDoesNotDeleteLegacyAuthKeys();
   await testPopupLoadsBackendPreferencesWhenAvailable();
+  await testPopupLoadsModelsAndRestoresSavedSelection();
+  await testPopupSavesSelectedModelLocally();
+  await testPopupClearsSavedModelWhenBackendRemovesIt();
   await testSaveVoiceSendsPreferencesToBackground();
   await testStrategyChangeSendsPreferencesToBackground();
   await testTemplateButtonAppliesStrategyAndSaves();
