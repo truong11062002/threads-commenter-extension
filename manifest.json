@@ -1,9 +1,12 @@
 {
   "manifest_version": 3,
   "name": "Threads AI Commenter",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "description": "Generate on-brand Threads replies in your voice with AI tones and saved comment strategies.",
-  "permissions": ["activeTab", "storage"],
+  "permissions": [
+    "activeTab",
+    "storage"
+  ],
   "host_permissions": [
     "https://www.threads.net/*",
     "https://www.threads.com/*",
@@ -27,8 +30,13 @@
   },
   "content_scripts": [
     {
-      "matches": ["https://www.threads.net/*", "https://www.threads.com/*"],
-      "js": ["content.js"],
+      "matches": [
+        "https://www.threads.net/*",
+        "https://www.threads.com/*"
+      ],
+      "js": [
+        "content.js"
+      ],
       "run_at": "document_idle"
     }
   ],
